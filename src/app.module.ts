@@ -4,6 +4,8 @@ import { ThrottlerModule } from '@nestjs/throttler';
 import { LoggerModule } from 'nestjs-pino';
 import { validateEnv } from './config/env.validation.js';
 import { PrismaModule } from './prisma/prisma.module.js';
+import { AuditModule } from './audit/audit.module.js';
+import { AuthModule } from './auth/auth.module.js';
 import { HealthModule } from './health/health.module.js';
 
 @Module({
@@ -43,6 +45,8 @@ import { HealthModule } from './health/health.module.js';
       },
     ]),
     PrismaModule,
+    AuditModule,
+    AuthModule,
     HealthModule,
   ],
 })
