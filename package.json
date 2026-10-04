@@ -18,7 +18,8 @@
     "test:cov": "NODE_OPTIONS=\"--experimental-vm-modules\" jest --coverage",
     "test:e2e": "NODE_OPTIONS=\"--experimental-vm-modules\" jest --config ./test/jest-e2e.json",
     "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate dev"
+    "prisma:migrate": "prisma migrate dev",
+    "seed": "node dist/src/seed.js"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",
