@@ -9,6 +9,9 @@ import { AuthModule } from './auth/auth.module.js';
 import { HealthModule } from './health/health.module.js';
 import { ReceptionModule } from './reception/reception.module.js';
 import { GrowthModule } from './growth/growth.module.js';
+import { CatalogModule } from './catalog/catalog.module.js';
+import { VitalsModule } from './vitals/vitals.module.js';
+import { DoctorModule } from './doctor/doctor.module.js';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 
@@ -54,6 +57,9 @@ import { AppService } from './app.service.js';
     HealthModule,
     ReceptionModule,
     GrowthModule,
+    CatalogModule,
+    VitalsModule,
+    DoctorModule,
   ],
   controllers: [AppController],
   providers: [AppService],
