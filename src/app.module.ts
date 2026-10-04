@@ -8,6 +8,9 @@ import { AuditModule } from './audit/audit.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import { HealthModule } from './health/health.module.js';
 import { ReceptionModule } from './reception/reception.module.js';
+import { GrowthModule } from './growth/growth.module.js';
+import { AppController } from './app.controller.js';
+import { AppService } from './app.service.js';
 
 @Module({
   imports: [
@@ -50,6 +53,9 @@ import { ReceptionModule } from './reception/reception.module.js';
     AuthModule,
     HealthModule,
     ReceptionModule,
+    GrowthModule,
   ],
+  controllers: [AppController],
+  providers: [AppService],
 })
 export class AppModule {}
