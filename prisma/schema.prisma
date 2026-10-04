@@ -1,0 +1,484 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  ADMIN
+  RECEPTIONIST
+  MEDICAL_OFFICER
+  DOCTOR
+}
+
+enum Sex {
+  MALE
+  FEMALE
+}
+
+enum MeasurementMethod {
+  RECUMBENT
+  STANDING
+}
+
+enum VisitType {
+  NEW
+  FOLLOW_UP
+}
+
+enum VisitStatus {
+  REGISTERED
+  VITALS_DONE
+  WAITING_DOCTOR
+  IN_CONSULTATION
+  COMPLETED
+  LEFT_WITHOUT_BEING_SEEN
+}
+
+enum AllergySeverity {
+  MILD
+  MODERATE
+  SEVERE
+  LIFE_THREATENING
+}
+
+enum RedFlagLevel {
+  NONE
+  PRIORITY
+  EMERGENCY
+}
+
+enum TriageLevel {
+  EMERGENCY
+  PRIORITY
+  ROUTINE
+}
+
+enum Avpu {
+  ALERT
+  VERBAL
+  PAIN
+  UNRESPONSIVE
+}
+
+enum ApprovalStatus {
+  PENDING_DOCTOR_APPROVAL
+  APPROVED
+}
+
+enum GrowthStandard {
+  CDC
+  WHO
+}
+
+enum GrowthMeasure {
+  WEIGHT_FOR_AGE
+  LENGTH_FOR_AGE
+  STATURE_FOR_AGE
+  BMI_FOR_AGE
+  HEAD_CIRCUMFERENCE_FOR_AGE
+  WEIGHT_FOR_LENGTH
+  WEIGHT_FOR_STATURE
+}
+
+model Hospital {
+  id        String    @id @default(uuid())
+  name      String
+  slug      String    @unique
+  address   String
+  phone     String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  users     User[]
+  patients  Patient[]
+  visits    Visit[]
+}
+
+model User {
+  id                  String         @id @default(uuid())
+  email               String         @unique
+  name                String
+  passwordHash        String
+  role                Role
+  hospitalId          String
+  hospital            Hospital       @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  temporaryPassword   Boolean        @default(false)
+  mustChangePassword  Boolean        @default(false)
+  failedLoginAttempts Int            @default(0)
+  lockedUntil         DateTime?
+  active              Boolean        @default(true)
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+
+  refreshTokens       RefreshToken[]
+  auditLogs           AuditLog[]
+
+  @@index([hospitalId])
+  @@index([email])
+}
+
+model RefreshToken {
+  id                  String    @id @default(uuid())
+  userId              String
+  user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash           String    @unique
+  expiresAt           DateTime
+  revokedAt           DateTime?
+  replacedByTokenHash String?
+  createdAt           DateTime  @default(now())
+
+  @@index([userId])
+}
+
+model Guardian {
+  id              String            @id @default(uuid())
+  name            String
+  relationship    String
+  phone           String
+  address         String?
+  motherStatureCm Float?
+  fatherStatureCm Float?
+  consentGiven    Boolean           @default(true)
+  consentDate     DateTime?         @default(now())
+  consentPurpose  String?           @default("Pediatric outpatient care and clinical observation")
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  patients        PatientGuardian[]
+
+  @@index([phone])
+}
+
+model Patient {
+  id                  String            @id @default(uuid())
+  uhid                String            @unique
+  name                String
+  dob                 DateTime
+  sex                 Sex
+  gestationalAgeWeeks Int?              @default(40)
+  birthWeightKg       Float?
+  bloodGroup          String?
+  hospitalId          String
+  hospital            Hospital          @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+
+  guardians           PatientGuardian[]
+  allergies           Allergy[]
+  visits              Visit[]
+
+  @@index([hospitalId])
+  @@index([uhid])
+  @@index([name])
+}
+
+model PatientGuardian {
+  id         String   @id @default(uuid())
+  patientId  String
+  guardianId String
+  isPrimary  Boolean  @default(true)
+  createdAt  DateTime @default(now())
+
+  patient    Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  guardian   Guardian @relation(fields: [guardianId], references: [id], onDelete: Cascade)
+
+  @@unique([patientId, guardianId])
+  @@index([patientId])
+  @@index([guardianId])
+}
+
+model Allergy {
+  id        String          @id @default(uuid())
+  patientId String
+  patient   Patient         @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  allergen  String
+  reaction  String
+  severity  AllergySeverity
+  notes     String?
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  @@index([patientId])
+}
+
+model Visit {
+  id               String             @id @default(uuid())
+  patientId        String
+  patient          Patient            @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  hospitalId       String
+  hospital         Hospital           @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  visitDate        DateTime           @default(now())
+  tokenNumber      Int
+  visitType        VisitType          @default(NEW)
+  status           VisitStatus        @default(REGISTERED)
+  complaintText    String?
+  notes            String?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  anthropometry    Anthropometry?
+  vitals           VitalSet[]
+  complaints       VisitComplaint[]
+  signs            VisitSign[]
+  triageResult     TriageResult?
+  priorityOverrides PriorityOverride[]
+
+  @@unique([hospitalId, visitDate, tokenNumber])
+  @@index([hospitalId, status])
+  @@index([patientId])
+  @@index([visitDate])
+}
+
+model Anthropometry {
+  id                  String            @id @default(uuid())
+  visitId             String            @unique
+  visit               Visit             @relation(fields: [visitId], references: [id], onDelete: Cascade)
+  weightKg            Float
+  lengthOrStatureCm   Float
+  measurementMethod   MeasurementMethod
+  headCircumferenceCm Float?
+  bmi                 Float?
+  recordedAt          DateTime          @default(now())
+  recordedBy          String?
+
+  @@index([visitId])
+}
+
+model VitalSet {
+  id                 String   @id @default(uuid())
+  visitId            String
+  visit              Visit    @relation(fields: [visitId], references: [id], onDelete: Cascade)
+  heartRateBpm       Int?
+  respiratoryRateBpm Int?
+  bpSystolic         Int?
+  bpDiastolic        Int?
+  spo2Percent        Float?
+  temperatureC       Float?
+  temperatureSite    String?
+  painScore          Int?
+  capillaryRefillSec Float?
+  avpu               Avpu?    @default(ALERT)
+  recordedAt         DateTime @default(now())
+  recordedBy         String?
+
+  @@index([visitId])
+}
+
+model Complaint {
+  id          String           @id @default(uuid())
+  name        String           @unique
+  description String?
+  active      Boolean          @default(true)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  signs       ComplaintSign[]
+  visits      VisitComplaint[]
+}
+
+model Sign {
+  id           String          @id @default(uuid())
+  name         String          @unique
+  bodySystem   String
+  redFlagLevel RedFlagLevel    @default(NONE)
+  active       Boolean         @default(true)
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  complaints   ComplaintSign[]
+  visits       VisitSign[]
+}
+
+model ComplaintSign {
+  id          String    @id @default(uuid())
+  complaintId String
+  signId      String
+  createdAt   DateTime  @default(now())
+
+  complaint   Complaint @relation(fields: [complaintId], references: [id], onDelete: Cascade)
+  sign        Sign      @relation(fields: [signId], references: [id], onDelete: Cascade)
+
+  @@unique([complaintId, signId])
+  @@index([complaintId])
+  @@index([signId])
+}
+
+model VisitComplaint {
+  id          String    @id @default(uuid())
+  visitId     String
+  complaintId String
+  createdAt   DateTime  @default(now())
+
+  visit       Visit     @relation(fields: [visitId], references: [id], onDelete: Cascade)
+  complaint   Complaint @relation(fields: [complaintId], references: [id], onDelete: Cascade)
+
+  @@unique([visitId, complaintId])
+  @@index([visitId])
+  @@index([complaintId])
+}
+
+model VisitSign {
+  id           String   @id @default(uuid())
+  visitId      String
+  signId       String
+  durationDays Int?
+  notes        String?
+  createdAt    DateTime @default(now())
+
+  visit        Visit    @relation(fields: [visitId], references: [id], onDelete: Cascade)
+  sign         Sign     @relation(fields: [signId], references: [id], onDelete: Cascade)
+
+  @@unique([visitId, signId])
+  @@index([visitId])
+  @@index([signId])
+}
+
+model GrowthReference {
+  id          String         @id @default(uuid())
+  standard    GrowthStandard
+  measure     GrowthMeasure
+  sex         Sex
+  ageMonths   Float
+  l           Float
+  m           Float
+  s           Float
+  p3          Float?
+  p5          Float?
+  p10         Float?
+  p25         Float?
+  p50         Float?
+  p75         Float?
+  p90         Float?
+  p95         Float?
+  p97         Float?
+  p85         Float?
+  sourceUrl   String
+  checksum    String
+  version     String         @default("2000-05-30")
+
+  @@unique([standard, measure, sex, ageMonths])
+  @@index([standard, measure, sex])
+}
+
+model VitalRange {
+  id           String         @id @default(uuid())
+  vitalName    String
+  minAgeMonths Int
+  maxAgeMonths Int
+  lowCritical  Float?
+  lowNormal    Float
+  highNormal   Float
+  highCritical Float?
+  unit         String
+  source       String
+  approvedBy   String?
+  status       ApprovalStatus @default(PENDING_DOCTOR_APPROVAL)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  @@index([vitalName, minAgeMonths, maxAgeMonths])
+}
+
+model TriageResult {
+  id            String      @id @default(uuid())
+  visitId       String      @unique
+  visit         Visit       @relation(fields: [visitId], references: [id], onDelete: Cascade)
+  level         TriageLevel
+  score         Int
+  reasons       Json
+  configVersion String      @default("v1.0")
+  createdAt     DateTime    @default(now())
+
+  @@index([level])
+}
+
+model PriorityOverride {
+  id            String      @id @default(uuid())
+  visitId       String
+  visit         Visit       @relation(fields: [visitId], references: [id], onDelete: Cascade)
+  originalLevel TriageLevel
+  overrideLevel TriageLevel
+  reason        String
+  clinicianId   String
+  clinicianName String
+  overriddenAt  DateTime    @default(now())
+
+  @@index([visitId])
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  userRole   String?
+  action     String
+  entityName String
+  entityId   String?
+  timestamp  DateTime @default(now())
+  ipAddress  String?
+  userAgent  String?
+  details    Json?
+
+  @@index([userId])
+  @@index([entityName, entityId])
+  @@index([timestamp])
+}
+
+// Phase 2 Schema Room Only
+model Drug {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  genericName String
+  createdAt   DateTime @default(now())
+}
+
+model DosingRule {
+  id             String         @id @default(uuid())
+  drugName       String
+  minAgeMonths   Int?
+  maxAgeMonths   Int?
+  mgPerKgPerDose Float?
+  maxDoseMg      Float?
+  frequency      String?
+  indication     String?
+  sourceCitation String
+  status         ApprovalStatus @default(PENDING_DOCTOR_APPROVAL)
+  createdAt      DateTime       @default(now())
+}
+
+model Prescription {
+  id           String   @id @default(uuid())
+  visitId      String
+  drugName     String
+  doseText     String
+  instructions String
+  createdAt    DateTime @default(now())
+}
+
+model FollowUpPlan {
+  id         String   @id @default(uuid())
+  visitId    String
+  targetDate DateTime
+  status     String   @default("SCHEDULED")
+  createdAt  DateTime @default(now())
+}
+
+model FollowUpResponse {
+  id              String   @id @default(uuid())
+  planId          String
+  responsePayload Json
+  escalated       Boolean  @default(false)
+  createdAt       DateTime @default(now())
+}
+
+model Message {
+  id          String   @id @default(uuid())
+  senderId    String
+  recipientId String
+  content     String
+  createdAt   DateTime @default(now())
+}
