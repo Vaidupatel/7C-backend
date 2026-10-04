@@ -75,4 +75,21 @@ export class AuditService {
     }
     return clean;
   }
+
+  async getAuditLogs(limit: number = 50) {
+    return this.prisma.auditLog.findMany({
+      orderBy: { timestamp: 'desc' },
+      take: limit,
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true,
+          },
+        },
+      },
+    });
+  }
 }
