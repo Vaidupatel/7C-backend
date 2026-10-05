@@ -8,6 +8,7 @@ export interface RequestUser {
   role: Role;
   hospitalId: string;
   name: string;
+  mustChangePassword: boolean;
 }
 
 export const CurrentUser = createParamDecorator(

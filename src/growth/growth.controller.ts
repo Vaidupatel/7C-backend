@@ -4,15 +4,12 @@ import {
   Post,
   Body,
   Query,
-  UseGuards,
   HttpCode,
   HttpStatus,
   BadRequestException,
 } from '@nestjs/common';
 import { GrowthService } from './growth.service.js';
 import { EvaluateGrowthDto } from './dto/evaluate-growth.dto.js';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
-import { RolesGuard } from '../auth/guards/roles.guard.js';
 import { Roles } from '../auth/decorators/roles.decorator.js';
 import {
   Role,
@@ -22,12 +19,11 @@ import {
 } from '../generated/prisma/enums.js';
 
 @Controller('growth')
-@UseGuards(JwtAuthGuard, RolesGuard)
 export class GrowthController {
   constructor(private readonly growthService: GrowthService) {}
 
   @Get('chart-curves')
-  @Roles(Role.DOCTOR, Role.MEDICAL_OFFICER, Role.RECEPTIONIST, Role.ADMIN)
+  @Roles(Role.DOCTOR, Role.MEDICAL_OFFICER)
   getChartCurves(
     @Query('measure') measure: GrowthMeasure,
     @Query('sex') sex: Sex,
@@ -46,14 +42,14 @@ export class GrowthController {
   }
 
   @Post('evaluate')
-  @Roles(Role.DOCTOR, Role.MEDICAL_OFFICER, Role.RECEPTIONIST, Role.ADMIN)
+  @Roles(Role.DOCTOR, Role.MEDICAL_OFFICER)
   @HttpCode(HttpStatus.OK)
   async evaluateGrowth(@Body() dto: EvaluateGrowthDto) {
     return this.growthService.evaluateGrowth(dto);
   }
 
   @Get('lms')
-  @Roles(Role.DOCTOR, Role.MEDICAL_OFFICER, Role.RECEPTIONIST, Role.ADMIN)
+  @Roles(Role.DOCTOR, Role.MEDICAL_OFFICER)
   async getLms(
     @Query('standard') standard: GrowthStandard = GrowthStandard.CDC,
     @Query('measure') measure: GrowthMeasure,

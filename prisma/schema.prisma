@@ -142,7 +142,7 @@ model Guardian {
   address         String?
   motherStatureCm Float?
   fatherStatureCm Float?
-  consentGiven    Boolean           @default(true)
+  consentGiven    Boolean
   consentDate     DateTime?         @default(now())
   consentPurpose  String?           @default("Pediatric outpatient care and clinical observation")
   createdAt       DateTime          @default(now())
@@ -159,7 +159,7 @@ model Patient {
   name                String
   dob                 DateTime
   sex                 Sex
-  gestationalAgeWeeks Int?              @default(40)
+  gestationalAgeWeeks Int?
   birthWeightKg       Float?
   bloodGroup          String?
   hospitalId          String
@@ -183,8 +183,8 @@ model PatientGuardian {
   isPrimary  Boolean  @default(true)
   createdAt  DateTime @default(now())
 
-  patient    Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
-  guardian   Guardian @relation(fields: [guardianId], references: [id], onDelete: Cascade)
+  patient    Patient  @relation(fields: [patientId], references: [id], onDelete: Restrict)
+  guardian   Guardian @relation(fields: [guardianId], references: [id], onDelete: Restrict)
 
   @@unique([patientId, guardianId])
   @@index([patientId])
@@ -194,7 +194,7 @@ model PatientGuardian {
 model Allergy {
   id        String          @id @default(uuid())
   patientId String
-  patient   Patient         @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  patient   Patient         @relation(fields: [patientId], references: [id], onDelete: Restrict)
   allergen  String
   reaction  String
   severity  AllergySeverity
@@ -206,37 +206,39 @@ model Allergy {
 }
 
 model Visit {
-  id               String             @id @default(uuid())
-  patientId        String
-  patient          Patient            @relation(fields: [patientId], references: [id], onDelete: Cascade)
-  hospitalId       String
-  hospital         Hospital           @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
-  visitDate        DateTime           @default(now())
-  tokenNumber      Int
-  visitType        VisitType          @default(NEW)
-  status           VisitStatus        @default(REGISTERED)
-  complaintText    String?
-  notes            String?
-  createdAt        DateTime           @default(now())
-  updatedAt        DateTime           @updatedAt
+  id                String             @id @default(uuid())
+  patientId         String
+  patient           Patient            @relation(fields: [patientId], references: [id], onDelete: Restrict)
+  hospitalId        String
+  hospital          Hospital           @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  visitDate         DateTime           @default(now())
+  visitDay          DateTime           @default(now()) @db.Date
+  tokenNumber       Int
+  visitType         VisitType          @default(NEW)
+  status            VisitStatus        @default(REGISTERED)
+  complaintText     String?
+  notes             String?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
 
-  anthropometry    Anthropometry?
-  vitals           VitalSet[]
-  complaints       VisitComplaint[]
-  signs            VisitSign[]
-  triageResult     TriageResult?
+  anthropometry     Anthropometry?
+  vitals            VitalSet[]
+  complaints        VisitComplaint[]
+  signs             VisitSign[]
+  triageResult      TriageResult?
   priorityOverrides PriorityOverride[]
 
-  @@unique([hospitalId, visitDate, tokenNumber])
+  @@unique([hospitalId, visitDay, tokenNumber])
   @@index([hospitalId, status])
   @@index([patientId])
   @@index([visitDate])
+  @@index([visitDay])
 }
 
 model Anthropometry {
   id                  String            @id @default(uuid())
   visitId             String            @unique
-  visit               Visit             @relation(fields: [visitId], references: [id], onDelete: Cascade)
+  visit               Visit             @relation(fields: [visitId], references: [id], onDelete: Restrict)
   weightKg            Float
   lengthOrStatureCm   Float
   measurementMethod   MeasurementMethod
@@ -251,7 +253,7 @@ model Anthropometry {
 model VitalSet {
   id                 String   @id @default(uuid())
   visitId            String
-  visit              Visit    @relation(fields: [visitId], references: [id], onDelete: Cascade)
+  visit              Visit    @relation(fields: [visitId], references: [id], onDelete: Restrict)
   heartRateBpm       Int?
   respiratoryRateBpm Int?
   bpSystolic         Int?
@@ -313,7 +315,7 @@ model VisitComplaint {
   complaintId String
   createdAt   DateTime  @default(now())
 
-  visit       Visit     @relation(fields: [visitId], references: [id], onDelete: Cascade)
+  visit       Visit     @relation(fields: [visitId], references: [id], onDelete: Restrict)
   complaint   Complaint @relation(fields: [complaintId], references: [id], onDelete: Cascade)
 
   @@unique([visitId, complaintId])
@@ -329,7 +331,7 @@ model VisitSign {
   notes        String?
   createdAt    DateTime @default(now())
 
-  visit        Visit    @relation(fields: [visitId], references: [id], onDelete: Cascade)
+  visit        Visit    @relation(fields: [visitId], references: [id], onDelete: Restrict)
   sign         Sign     @relation(fields: [signId], references: [id], onDelete: Cascade)
 
   @@unique([visitId, signId])
@@ -386,7 +388,7 @@ model VitalRange {
 model TriageResult {
   id            String      @id @default(uuid())
   visitId       String      @unique
-  visit         Visit       @relation(fields: [visitId], references: [id], onDelete: Cascade)
+  visit         Visit       @relation(fields: [visitId], references: [id], onDelete: Restrict)
   level         TriageLevel
   score         Int
   reasons       Json
@@ -399,7 +401,7 @@ model TriageResult {
 model PriorityOverride {
   id            String      @id @default(uuid())
   visitId       String
-  visit         Visit       @relation(fields: [visitId], references: [id], onDelete: Cascade)
+  visit         Visit       @relation(fields: [visitId], references: [id], onDelete: Restrict)
   originalLevel TriageLevel
   overrideLevel TriageLevel
   reason        String

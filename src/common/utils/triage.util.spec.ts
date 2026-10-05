@@ -81,4 +81,25 @@ describe('triage.util', () => {
     expect(result.level).toBe('PRIORITY');
     expect(result.reasons.length).toBeGreaterThan(0);
   });
+
+  it('applies safety bias: missing vital data warnings escalate ROUTINE to PRIORITY', () => {
+    const input: TriageInput = {
+      vitalsSeverity: 'NORMAL',
+      vitalsReasons: [],
+      signs: [{ name: 'Cough', redFlagLevel: 'NONE' }],
+      waitingMinutes: 10,
+      missingDataWarnings: ['SpO2 not recorded'],
+    };
+    const result = calculateTriage(input);
+    expect(result.level).toBe('PRIORITY');
+    expect(result.score).toBeGreaterThanOrEqual(2000);
+    expect(
+      result.reasons.some((r) => r.includes('Safety bias escalation')),
+    ).toBe(true);
+    expect(
+      result.reasons.some((r) =>
+        r.includes('Missing data warning: SpO2 not recorded'),
+      ),
+    ).toBe(true);
+  });
 });

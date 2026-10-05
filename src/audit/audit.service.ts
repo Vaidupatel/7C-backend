@@ -76,10 +76,11 @@ export class AuditService {
     return clean;
   }
 
-  async getAuditLogs(limit: number = 50) {
+  async getAuditLogs(limit: number = 50, cursor?: string) {
     return this.prisma.auditLog.findMany({
       orderBy: { timestamp: 'desc' },
       take: limit,
+      ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
       include: {
         user: {
           select: {

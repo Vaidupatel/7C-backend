@@ -108,15 +108,15 @@ export function evaluateVitals(input: VitalInput): VitalEvaluationResult {
         vital: 'SpO2',
         value: `${spo2}%`,
         severity: 'CRITICAL',
-        reason: `Severe hypoxemia (SpO2 ${spo2}% < 90%)`,
+        reason: `Severe hypoxemia (SpO2 ${spo2}% < 90%) [PALS 2020: PENDING_DOCTOR_APPROVAL]`,
       });
       overallSeverity = getMaxSeverity(overallSeverity, 'CRITICAL');
-    } else if (spo2 <= 94) {
+    } else if (spo2 < 95) {
       findings.push({
         vital: 'SpO2',
         value: `${spo2}%`,
         severity: 'MODERATE',
-        reason: `Hypoxemia (SpO2 ${spo2}%, target >= 95%)`,
+        reason: `Hypoxemia (SpO2 ${spo2}%, target >= 95%) [PALS 2020: PENDING_DOCTOR_APPROVAL]`,
       });
       overallSeverity = getMaxSeverity(overallSeverity, 'MODERATE');
     }
@@ -278,6 +278,66 @@ export function evaluateVitals(input: VitalInput): VitalEvaluationResult {
         value: `${temp}°C`,
         severity: 'MILD',
         reason: `Fever (temperature ${temp}°C >= 38.0°C)`,
+      });
+      overallSeverity = getMaxSeverity(overallSeverity, 'MILD');
+    }
+  }
+
+  // 7. Blood Pressure (PALS 2020 / AAP 2017 Guidelines: PENDING_DOCTOR_APPROVAL)
+  if (input.bpSystolic != null && Number.isFinite(input.bpSystolic)) {
+    const sbp = input.bpSystolic;
+    const dbp = input.bpDiastolic;
+    const ageMonths = input.ageMonths || 0;
+    const ageYears = Math.floor(ageMonths / 12);
+
+    // Calculate PALS hypotension (5th percentile SBP) cutoff
+    let hypotensionCutoff = 60;
+    if (ageMonths < 1) {
+      hypotensionCutoff = 60;
+    } else if (ageMonths < 12) {
+      hypotensionCutoff = 70;
+    } else if (ageYears <= 10) {
+      hypotensionCutoff = 70 + 2 * ageYears;
+    } else {
+      hypotensionCutoff = 90;
+    }
+
+    if (sbp < hypotensionCutoff) {
+      findings.push({
+        vital: 'BP',
+        value: dbp != null ? `${sbp}/${dbp} mmHg` : `${sbp} mmHg (systolic)`,
+        severity: 'CRITICAL',
+        reason: `Decompensated hypotension (SBP ${sbp} < ${hypotensionCutoff} mmHg) - high shock risk [PALS 2020: PENDING_DOCTOR_APPROVAL]`,
+      });
+      overallSeverity = getMaxSeverity(overallSeverity, 'CRITICAL');
+    } else if (sbp >= 140 || (dbp != null && dbp >= 90)) {
+      findings.push({
+        vital: 'BP',
+        value: dbp != null ? `${sbp}/${dbp} mmHg` : `${sbp} mmHg`,
+        severity: 'MODERATE',
+        reason: `Severe hypertension (BP >= 140/90 mmHg) [AAP 2017: PENDING_DOCTOR_APPROVAL]`,
+      });
+      overallSeverity = getMaxSeverity(overallSeverity, 'MODERATE');
+    }
+  }
+
+  // 8. Pain Score (0-10 Wong-Baker FACES / Numeric: PENDING_DOCTOR_APPROVAL)
+  if (input.painScore != null && Number.isFinite(input.painScore)) {
+    const pain = input.painScore;
+    if (pain >= 7) {
+      findings.push({
+        vital: 'Pain',
+        value: `${pain}/10`,
+        severity: 'MODERATE',
+        reason: `Severe pain reported (${pain}/10) [PENDING_DOCTOR_APPROVAL]`,
+      });
+      overallSeverity = getMaxSeverity(overallSeverity, 'MODERATE');
+    } else if (pain >= 4) {
+      findings.push({
+        vital: 'Pain',
+        value: `${pain}/10`,
+        severity: 'MILD',
+        reason: `Moderate pain reported (${pain}/10) [PENDING_DOCTOR_APPROVAL]`,
       });
       overallSeverity = getMaxSeverity(overallSeverity, 'MILD');
     }

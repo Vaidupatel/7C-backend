@@ -1,21 +1,26 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Query,
+  ParseIntPipe,
+  DefaultValuePipe,
+} from '@nestjs/common';
 import { AuditService } from './audit.service.js';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
-import { RolesGuard } from '../auth/guards/roles.guard.js';
 import { Roles } from '../auth/decorators/roles.decorator.js';
 import { Role } from '../generated/prisma/enums.js';
 
 @Controller('audit')
-@UseGuards(JwtAuthGuard, RolesGuard)
 export class AuditController {
   constructor(private readonly auditService: AuditService) {}
 
+  // B6 fix: Use ParseIntPipe to prevent NaN, cap pagination at 100, support cursor
   @Get()
   @Roles(Role.ADMIN)
-  async getLogs(@Query('limit') limit?: string) {
-    const numLimit = limit
-      ? Math.min(Math.max(1, parseInt(limit, 10)), 100)
-      : 50;
-    return this.auditService.getAuditLogs(numLimit);
+  async getLogs(
+    @Query('limit', new DefaultValuePipe(50), ParseIntPipe) limit: number,
+    @Query('cursor') cursor?: string,
+  ) {
+    const safeLimit = Math.min(Math.max(1, limit), 100);
+    return this.auditService.getAuditLogs(safeLimit, cursor);
   }
 }

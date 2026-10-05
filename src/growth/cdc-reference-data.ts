@@ -1305,8 +1305,10 @@ export function getBuiltinLms(
 ): LmsParams {
   const dataset = CDC_REFERENCE_DATA[sex]?.[measure] || [];
   if (dataset.length === 0) {
-    // Default fallback
-    return { l: 0, m: 10, s: 0.1 };
+    // Safety bias (Finding C8 & Clinical Rule 5): Never return confident garbage fallback
+    throw new Error(
+      `No growth reference data available for ${standard} ${measure} ${sex} at ${ageMonths} months (PENDING_DOCTOR_APPROVAL)`,
+    );
   }
 
   // Exact or closest match

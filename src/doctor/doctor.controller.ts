@@ -2,35 +2,33 @@ import {
   Controller,
   Get,
   Post,
+  Patch,
   Body,
   Param,
-  UseGuards,
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
 import { DoctorService } from './doctor.service.js';
 import { OverridePriorityDto } from './dto/override-priority.dto.js';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
-import { RolesGuard } from '../auth/guards/roles.guard.js';
-import { HospitalScopeGuard } from '../auth/guards/hospital-scope.guard.js';
+import { UpdateVisitStatusDto } from './dto/update-visit-status.dto.js';
 import { Roles } from '../auth/decorators/roles.decorator.js';
 import { CurrentUser } from '../auth/decorators/current-user.decorator.js';
 import type { RequestUser } from '../auth/decorators/current-user.decorator.js';
 import { Role } from '../generated/prisma/enums.js';
 
 @Controller('doctor')
-@UseGuards(JwtAuthGuard, RolesGuard, HospitalScopeGuard)
 export class DoctorController {
   constructor(private readonly doctorService: DoctorService) {}
 
   @Get('queue')
-  @Roles(Role.DOCTOR, Role.MEDICAL_OFFICER, Role.ADMIN)
+  @Roles(Role.DOCTOR, Role.MEDICAL_OFFICER)
   async getDoctorQueue(@CurrentUser('hospitalId') hospitalId: string) {
     return this.doctorService.getDoctorQueue(hospitalId);
   }
 
+  // B3 fix: Only DOCTOR can override priority (clinical decision)
   @Post('triage/override')
-  @Roles(Role.DOCTOR, Role.ADMIN)
+  @Roles(Role.DOCTOR)
   @HttpCode(HttpStatus.OK)
   async overridePriority(
     @CurrentUser() user: RequestUser,
@@ -45,11 +43,29 @@ export class DoctorController {
   }
 
   @Get('patients/:id')
-  @Roles(Role.DOCTOR, Role.MEDICAL_OFFICER, Role.ADMIN)
+  @Roles(Role.DOCTOR, Role.MEDICAL_OFFICER)
   async getPatientDetails(
     @CurrentUser('hospitalId') hospitalId: string,
     @Param('id') id: string,
   ) {
     return this.doctorService.getPatientDetails(hospitalId, id);
+  }
+
+  // C7 fix: Visit lifecycle state transitions (IN_CONSULTATION, COMPLETED, LEFT_WITHOUT_BEING_SEEN)
+  @Patch('visits/:id/status')
+  @Roles(Role.DOCTOR, Role.MEDICAL_OFFICER)
+  @HttpCode(HttpStatus.OK)
+  async updateVisitStatus(
+    @CurrentUser('hospitalId') hospitalId: string,
+    @CurrentUser('userId') clinicianId: string,
+    @Param('id') visitId: string,
+    @Body() dto: UpdateVisitStatusDto,
+  ) {
+    return this.doctorService.updateVisitStatus(
+      hospitalId,
+      visitId,
+      clinicianId,
+      dto,
+    );
   }
 }

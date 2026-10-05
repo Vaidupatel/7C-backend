@@ -1,19 +1,21 @@
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
-import { ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { LoggerModule } from 'nestjs-pino';
 import { validateEnv } from './config/env.validation.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 import { AuditModule } from './audit/audit.module.js';
 import { AuthModule } from './auth/auth.module.js';
+import { JwtAuthGuard } from './auth/guards/jwt-auth.guard.js';
+import { RolesGuard } from './auth/guards/roles.guard.js';
+import { MustChangePasswordGuard } from './auth/guards/must-change-password.guard.js';
 import { HealthModule } from './health/health.module.js';
 import { ReceptionModule } from './reception/reception.module.js';
 import { GrowthModule } from './growth/growth.module.js';
 import { CatalogModule } from './catalog/catalog.module.js';
 import { VitalsModule } from './vitals/vitals.module.js';
 import { DoctorModule } from './doctor/doctor.module.js';
-import { AppController } from './app.controller.js';
-import { AppService } from './app.service.js';
 
 @Module({
   imports: [
@@ -45,10 +47,17 @@ import { AppService } from './app.service.js';
             : undefined,
       },
     }),
+    // Security Check 28: Global + named throttle configs
     ThrottlerModule.forRoot([
       {
+        name: 'global',
         ttl: 60000,
         limit: 100,
+      },
+      {
+        name: 'auth',
+        ttl: 60000,
+        limit: process.env.NODE_ENV === 'test' ? 1000 : 5,
       },
     ]),
     PrismaModule,
@@ -61,7 +70,27 @@ import { AppService } from './app.service.js';
     VitalsModule,
     DoctorModule,
   ],
-  controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    // Security Check 28: Register ThrottlerGuard globally
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
+    // B1 fix: Default-deny JWT auth — all endpoints require auth unless @Public()
+    {
+      provide: APP_GUARD,
+      useClass: JwtAuthGuard,
+    },
+    // B1 fix: Default-deny roles — all endpoints require @Roles() unless @Public()
+    {
+      provide: APP_GUARD,
+      useClass: RolesGuard,
+    },
+    // A9 fix: Block mustChangePassword users from non-auth endpoints
+    {
+      provide: APP_GUARD,
+      useClass: MustChangePasswordGuard,
+    },
+  ],
 })
 export class AppModule {}

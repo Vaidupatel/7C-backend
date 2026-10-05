@@ -14,6 +14,82 @@ export interface AgeResult {
   formattedAge: string;
 }
 
+export const HOSPITAL_TIMEZONE = 'Asia/Kolkata';
+
+export function getZonedDateParts(
+  date: Date,
+  timeZone: string = HOSPITAL_TIMEZONE,
+): {
+  year: number;
+  month: number;
+  day: number;
+  hour: number;
+  minute: number;
+  second: number;
+} {
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: 'numeric',
+    second: 'numeric',
+    hour12: false,
+  });
+  const parts = formatter.formatToParts(date);
+  let year = 0;
+  let month = 0;
+  let day = 0;
+  let hour = 0;
+  let minute = 0;
+  let second = 0;
+  for (const part of parts) {
+    if (part.type === 'year') year = parseInt(part.value, 10);
+    if (part.type === 'month') month = parseInt(part.value, 10) - 1; // 0-indexed like Date.getMonth()
+    if (part.type === 'day') day = parseInt(part.value, 10);
+    if (part.type === 'hour') hour = parseInt(part.value, 10);
+    if (part.type === 'minute') minute = parseInt(part.value, 10);
+    if (part.type === 'second') second = parseInt(part.value, 10);
+  }
+  return { year, month, day, hour, minute, second };
+}
+
+/**
+ * Returns UTC start and end boundaries for a given calendar day in the hospital timezone (IST).
+ * Also returns the Date object for Postgres @db.Date column and the YYYY-MM-DD string.
+ */
+export function getHospitalDayBoundaries(
+  dateInput: Date | string = new Date(),
+  timeZone: string = HOSPITAL_TIMEZONE,
+) {
+  const date = typeof dateInput === 'string' ? new Date(dateInput) : dateInput;
+  const parts = getZonedDateParts(date, timeZone);
+
+  // IST offset is UTC+5:30 (+330 minutes)
+  const istOffsetMs = 5.5 * 60 * 60 * 1000;
+  const midnightIstUtcMs =
+    Date.UTC(parts.year, parts.month, parts.day, 0, 0, 0, 0) - istOffsetMs;
+  const startOfDay = new Date(midnightIstUtcMs);
+  const endOfDay = new Date(midnightIstUtcMs + 24 * 60 * 60 * 1000 - 1);
+
+  // visitDay represents calendar date (stored in @db.Date column in Postgres)
+  const visitDay = new Date(Date.UTC(parts.year, parts.month, parts.day));
+  const monthStr = String(parts.month + 1).padStart(2, '0');
+  const dayStr = String(parts.day).padStart(2, '0');
+  const dateStr = `${parts.year}-${monthStr}-${dayStr}`;
+
+  return {
+    startOfDay,
+    endOfDay,
+    visitDay,
+    dateStr,
+    year: parts.year,
+    month: parts.month + 1,
+    day: parts.day,
+  };
+}
+
 export function calculateAge(
   dobInput: Date | string,
   referenceDateInput: Date | string = new Date(),
@@ -31,19 +107,30 @@ export function calculateAge(
   if (isNaN(refDate.getTime())) {
     throw new Error('Invalid Reference Date provided');
   }
-  if (dob > refDate) {
+
+  // C9: Use hospital timezone (Asia/Kolkata) for calendar boundaries
+  const birth = getZonedDateParts(dob, HOSPITAL_TIMEZONE);
+  const ref = getZonedDateParts(refDate, HOSPITAL_TIMEZONE);
+
+  const birthUtc = Date.UTC(birth.year, birth.month, birth.day);
+  const refUtc = Date.UTC(ref.year, ref.month, ref.day);
+
+  if (
+    birthUtc > refUtc ||
+    (birthUtc === refUtc && dob.getTime() > refDate.getTime())
+  ) {
     throw new Error(
       'Date of Birth cannot be in the future relative to the reference date',
     );
   }
 
-  const birthYear = dob.getFullYear();
-  const birthMonth = dob.getMonth();
-  const birthDay = dob.getDate();
+  const birthYear = birth.year;
+  const birthMonth = birth.month;
+  const birthDay = birth.day;
 
-  const refYear = refDate.getFullYear();
-  const refMonth = refDate.getMonth();
-  const refDay = refDate.getDate();
+  const refYear = ref.year;
+  const refMonth = ref.month;
+  const refDay = ref.day;
 
   let years = refYear - birthYear;
   let months = refMonth - birthMonth;
@@ -51,8 +138,8 @@ export function calculateAge(
 
   if (days < 0) {
     months -= 1;
-    // Get total days in previous month
-    const prevMonthDays = new Date(refYear, refMonth, 0).getDate();
+    // Get total days in previous month using UTC to avoid DST shifts
+    const prevMonthDays = new Date(Date.UTC(refYear, refMonth, 0)).getUTCDate();
     days += prevMonthDays;
   }
 

@@ -1,4 +1,4 @@
-import { calculateAge } from './age.util.js';
+import { calculateAge, getHospitalDayBoundaries } from './age.util.js';
 
 describe('calculateAge (Pure Logic)', () => {
   it('calculates age for a newborn on the same day as birth', () => {
@@ -85,5 +85,41 @@ describe('calculateAge (Pure Logic)', () => {
     expect(() => calculateAge(dob, ref)).toThrow(
       'Date of Birth cannot be in the future',
     );
+  });
+
+  describe('getHospitalDayBoundaries (Finding C9)', () => {
+    it('correctly calculates boundaries across midnight IST before UTC rollover', () => {
+      // 2026-10-04T19:00:00Z is 2026-10-05 00:30:00 IST
+      const date = new Date('2026-10-04T19:00:00Z');
+      const boundaries = getHospitalDayBoundaries(date);
+
+      expect(boundaries.dateStr).toBe('2026-10-05');
+      expect(boundaries.year).toBe(2026);
+      expect(boundaries.month).toBe(10);
+      expect(boundaries.day).toBe(5);
+      expect(boundaries.startOfDay.toISOString()).toBe(
+        '2026-10-04T18:30:00.000Z',
+      );
+      expect(boundaries.endOfDay.toISOString()).toBe(
+        '2026-10-05T18:29:59.999Z',
+      );
+    });
+
+    it('correctly calculates boundaries before midnight IST', () => {
+      // 2026-10-04T18:00:00Z is 2026-10-04 23:30:00 IST
+      const date = new Date('2026-10-04T18:00:00Z');
+      const boundaries = getHospitalDayBoundaries(date);
+
+      expect(boundaries.dateStr).toBe('2026-10-04');
+      expect(boundaries.year).toBe(2026);
+      expect(boundaries.month).toBe(10);
+      expect(boundaries.day).toBe(4);
+      expect(boundaries.startOfDay.toISOString()).toBe(
+        '2026-10-03T18:30:00.000Z',
+      );
+      expect(boundaries.endOfDay.toISOString()).toBe(
+        '2026-10-04T18:29:59.999Z',
+      );
+    });
   });
 });

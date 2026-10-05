@@ -19,7 +19,7 @@ export class DoctorService {
           in: [
             VisitStatus.WAITING_DOCTOR,
             VisitStatus.VITALS_DONE,
-            VisitStatus.REGISTERED,
+            VisitStatus.IN_CONSULTATION,
           ],
         },
       },
@@ -106,6 +106,7 @@ export class DoctorService {
         waitingMinutes: waitMinutes,
         effectiveLevel,
         originalLevel: v.triageResult?.level || TriageLevel.ROUTINE,
+        isOverridden: !!latestOverride,
         score: sortScore,
         reasons,
         complaints: v.complaints.map((c) => c.complaint.name),
@@ -118,7 +119,15 @@ export class DoctorService {
           reaction: a.reaction,
           severity: a.severity,
         })),
-        hasGrowthFlag: (v.anthropometry?.weightKg || 0) < 4.0,
+        hasGrowthFlag: reasons.some(
+          (r) =>
+            r.toLowerCase().includes('growth') ||
+            r.toLowerCase().includes('underweight') ||
+            r.toLowerCase().includes('microcephaly') ||
+            r.toLowerCase().includes('stature') ||
+            r.toLowerCase().includes('stunting') ||
+            r.toLowerCase().includes('wasting'),
+        ),
         latestVitals: v.vitals[0] || null,
         anthropometry: v.anthropometry,
       };
@@ -168,25 +177,8 @@ export class DoctorService {
       },
     });
 
-    // 2. Update TriageResult score and level
-    let newScore = 1000;
-    if (dto.overrideLevel === TriageLevel.EMERGENCY) newScore = 3500;
-    else if (dto.overrideLevel === TriageLevel.PRIORITY) newScore = 2500;
-
-    await this.prisma.triageResult.upsert({
-      where: { visitId: visit.id },
-      update: {
-        level: dto.overrideLevel,
-        score: newScore,
-      },
-      create: {
-        visitId: visit.id,
-        level: dto.overrideLevel,
-        score: newScore,
-        reasons: [`Doctor override: ${dto.reason}`],
-        configVersion: 'override',
-      },
-    });
+    // 2. System TriageResult remains immutable (Finding C6 & Clinical Rule 5).
+    // The override is recorded in PriorityOverride table and reflected in effectiveLevel.
 
     // 3. Audit log (without sensitive patient data)
     await this.prisma.auditLog.create({
@@ -244,5 +236,47 @@ export class DoctorService {
     }
 
     return patient;
+  }
+
+  /**
+   * C7 fix: Visit lifecycle state transitions (IN_CONSULTATION, COMPLETED, LEFT_WITHOUT_BEING_SEEN)
+   */
+  async updateVisitStatus(
+    hospitalId: string,
+    visitId: string,
+    clinicianId: string,
+    dto: { status: VisitStatus; notes?: string },
+  ) {
+    const visit = await this.prisma.visit.findUnique({
+      where: { id: visitId },
+    });
+
+    if (!visit || visit.hospitalId !== hospitalId) {
+      throw new NotFoundException('Visit not found');
+    }
+
+    const previousStatus = visit.status;
+
+    const updated = await this.prisma.visit.update({
+      where: { id: visitId },
+      data: { status: dto.status },
+    });
+
+    await this.prisma.auditLog.create({
+      data: {
+        userId: clinicianId,
+        userRole: 'DOCTOR',
+        action: 'VISIT_STATUS_TRANSITION',
+        entityName: 'Visit',
+        entityId: visit.id,
+        details: {
+          previousStatus,
+          newStatus: dto.status,
+          notes: dto.notes,
+        },
+      },
+    });
+
+    return updated;
   }
 }

@@ -8,12 +8,15 @@ import { RecordVitalsDto } from './dto/record-vitals.dto.js';
 import { calculateAge } from '../common/utils/age.util.js';
 import { evaluateVitals } from '../common/utils/vitals.util.js';
 import { calculateTriage } from '../common/utils/triage.util.js';
-import { evaluateGrowthFlag } from '../common/utils/growth.util.js';
 import { VisitStatus } from '../generated/prisma/enums.js';
+import { GrowthService } from '../growth/growth.service.js';
 
 @Injectable()
 export class VitalsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly growthService: GrowthService,
+  ) {}
 
   async getNeedsVitalsQueue(hospitalId: string) {
     return this.prisma.visit.findMany({
@@ -152,14 +155,31 @@ export class VitalsService {
     }> = [];
 
     if (visit.anthropometry) {
-      const anthro = visit.anthropometry;
-      // We evaluate underweight / microcephaly if z-score or extremes apply
-      // Fallback simple checks for underweight z-score approximation
-      if (anthro.weightKg < 3.0 && ageMonths > 6) {
-        const flag = evaluateGrowthFlag('WEIGHT_FOR_AGE', -3.2, 0.1);
+      try {
+        const growthEval = await this.growthService.evaluateGrowth({
+          sex: visit.patient.sex,
+          ageMonths,
+          weightKg: visit.anthropometry.weightKg,
+          lengthOrStatureCm: visit.anthropometry.lengthOrStatureCm,
+          headCircumferenceCm:
+            visit.anthropometry.headCircumferenceCm ?? undefined,
+        });
+
+        for (const ev of growthEval.evaluations) {
+          if (ev.severity !== 'NORMAL') {
+            growthFlags.push({
+              severity: ev.severity,
+              label:
+                ev.clinicalFlag ||
+                `${ev.measure} Z=${ev.zScore} (${ev.percentile}th %ile)`,
+            });
+          }
+        }
+      } catch {
+        // Clinical Rule 5: Mark NOT_EVALUATED / safety bias if growth data missing
         growthFlags.push({
-          severity: flag.severity,
-          label: flag.clinicalFlag || 'Severe Underweight',
+          severity: 'PRIORITY',
+          label: 'Growth: Reference data pending approval / not evaluated',
         });
       }
     }

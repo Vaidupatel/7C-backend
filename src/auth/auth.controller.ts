@@ -5,7 +5,6 @@ import {
   Body,
   Req,
   Res,
-  UseGuards,
   UnauthorizedException,
   ForbiddenException,
   HttpCode,
@@ -13,12 +12,12 @@ import {
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { ConfigService } from '@nestjs/config';
+import { Throttle } from '@nestjs/throttler';
 import { AuthService, UserResponse } from './auth.service.js';
 import { LoginDto } from './dto/login.dto.js';
 import { ChangePasswordDto } from './dto/change-password.dto.js';
 import { AdminResetPasswordDto } from './dto/admin-reset-password.dto.js';
-import { JwtAuthGuard } from './guards/jwt-auth.guard.js';
-import { RolesGuard } from './guards/roles.guard.js';
+import { Public } from './decorators/public.decorator.js';
 import { Roles } from './decorators/roles.decorator.js';
 import { CurrentUser } from './decorators/current-user.decorator.js';
 import type { RequestUser } from './decorators/current-user.decorator.js';
@@ -42,6 +41,10 @@ export class AuthController {
   }
 
   @Post('login')
+  @Public()
+  @Throttle({
+    auth: { ttl: 60000, limit: process.env.NODE_ENV === 'test' ? 1000 : 5 },
+  })
   @HttpCode(HttpStatus.OK)
   async login(
     @Body() loginDto: LoginDto,
@@ -70,6 +73,8 @@ export class AuthController {
   }
 
   @Post('refresh')
+  @Public()
+  @Throttle({ auth: { ttl: 60000, limit: 10 } })
   @HttpCode(HttpStatus.OK)
   async refresh(
     @Req() req: Request,
@@ -88,13 +93,15 @@ export class AuthController {
       req.headers['user-agent'],
     );
 
-    res.cookie('refreshToken', tokens.refreshToken, {
-      httpOnly: true,
-      secure: this.isProd,
-      sameSite: 'lax',
-      path: '/api/auth',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    });
+    if (tokens.refreshToken) {
+      res.cookie('refreshToken', tokens.refreshToken, {
+        httpOnly: true,
+        secure: this.isProd,
+        sameSite: 'lax',
+        path: '/api/auth',
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+      });
+    }
 
     return {
       accessToken: tokens.accessToken,
@@ -102,6 +109,7 @@ export class AuthController {
   }
 
   @Post('logout')
+  @Public()
   @HttpCode(HttpStatus.OK)
   async logout(
     @Req() req: Request,
@@ -125,13 +133,13 @@ export class AuthController {
   }
 
   @Get('me')
-  @UseGuards(JwtAuthGuard)
+  @Roles(Role.ADMIN, Role.RECEPTIONIST, Role.MEDICAL_OFFICER, Role.DOCTOR)
   getMe(@CurrentUser() user: RequestUser): RequestUser {
     return user;
   }
 
   @Post('change-password')
-  @UseGuards(JwtAuthGuard)
+  @Roles(Role.ADMIN, Role.RECEPTIONIST, Role.MEDICAL_OFFICER, Role.DOCTOR)
   @HttpCode(HttpStatus.OK)
   async changePassword(
     @CurrentUser('userId') userId: string,
@@ -154,7 +162,6 @@ export class AuthController {
   }
 
   @Post('admin-reset-password')
-  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
   @HttpCode(HttpStatus.OK)
   async adminResetPassword(

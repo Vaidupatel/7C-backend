@@ -68,15 +68,59 @@ describe('Reception & Intake Module (e2e)', () => {
     );
     await app.init();
 
-    // Clean up any residual test patients
+    // Clean up any residual test patients respecting onDelete: Restrict
     const prisma = app.get(PrismaService);
-    await prisma.patient.deleteMany({
-      where: {
-        name: {
-          in: ['Aarav Kumar', 'Concurrent Child 1', 'Concurrent Child 2'],
+    const cleanTestPatients = async (prismaClient: PrismaService) => {
+      const testPatients = await prismaClient.patient.findMany({
+        where: {
+          name: {
+            in: ['Aarav Kumar', 'Concurrent Child 1', 'Concurrent Child 2'],
+          },
         },
-      },
-    });
+        select: { id: true },
+      });
+      const patientIds = testPatients.map((p) => p.id);
+      if (patientIds.length > 0) {
+        const visits = await prismaClient.visit.findMany({
+          where: { patientId: { in: patientIds } },
+          select: { id: true },
+        });
+        const visitIds = visits.map((v) => v.id);
+        if (visitIds.length > 0) {
+          await prismaClient.anthropometry.deleteMany({
+            where: { visitId: { in: visitIds } },
+          });
+          await prismaClient.vitalSet.deleteMany({
+            where: { visitId: { in: visitIds } },
+          });
+          await prismaClient.visitSign.deleteMany({
+            where: { visitId: { in: visitIds } },
+          });
+          await prismaClient.visitComplaint.deleteMany({
+            where: { visitId: { in: visitIds } },
+          });
+          await prismaClient.triageResult.deleteMany({
+            where: { visitId: { in: visitIds } },
+          });
+          await prismaClient.priorityOverride.deleteMany({
+            where: { visitId: { in: visitIds } },
+          });
+          await prismaClient.visit.deleteMany({
+            where: { id: { in: visitIds } },
+          });
+        }
+        await prismaClient.allergy.deleteMany({
+          where: { patientId: { in: patientIds } },
+        });
+        await prismaClient.patientGuardian.deleteMany({
+          where: { patientId: { in: patientIds } },
+        });
+        await prismaClient.patient.deleteMany({
+          where: { id: { in: patientIds } },
+        });
+      }
+    };
+    await cleanTestPatients(prisma);
 
     // Login as receptionist
     const loginRes = await request(app.getHttpServer())
@@ -90,13 +134,54 @@ describe('Reception & Intake Module (e2e)', () => {
 
   afterAll(async () => {
     const prisma = app.get(PrismaService);
-    await prisma.patient.deleteMany({
+    const testPatients = await prisma.patient.findMany({
       where: {
         name: {
           in: ['Aarav Kumar', 'Concurrent Child 1', 'Concurrent Child 2'],
         },
       },
+      select: { id: true },
     });
+    const patientIds = testPatients.map((p) => p.id);
+    if (patientIds.length > 0) {
+      const visits = await prisma.visit.findMany({
+        where: { patientId: { in: patientIds } },
+        select: { id: true },
+      });
+      const visitIds = visits.map((v) => v.id);
+      if (visitIds.length > 0) {
+        await prisma.anthropometry.deleteMany({
+          where: { visitId: { in: visitIds } },
+        });
+        await prisma.vitalSet.deleteMany({
+          where: { visitId: { in: visitIds } },
+        });
+        await prisma.visitSign.deleteMany({
+          where: { visitId: { in: visitIds } },
+        });
+        await prisma.visitComplaint.deleteMany({
+          where: { visitId: { in: visitIds } },
+        });
+        await prisma.triageResult.deleteMany({
+          where: { visitId: { in: visitIds } },
+        });
+        await prisma.priorityOverride.deleteMany({
+          where: { visitId: { in: visitIds } },
+        });
+        await prisma.visit.deleteMany({
+          where: { id: { in: visitIds } },
+        });
+      }
+      await prisma.allergy.deleteMany({
+        where: { patientId: { in: patientIds } },
+      });
+      await prisma.patientGuardian.deleteMany({
+        where: { patientId: { in: patientIds } },
+      });
+      await prisma.patient.deleteMany({
+        where: { id: { in: patientIds } },
+      });
+    }
     await app.close();
   });
 

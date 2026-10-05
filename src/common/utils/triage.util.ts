@@ -92,6 +92,15 @@ export function calculateTriage(input: TriageInput): TriageOutput {
     level = 'EMERGENCY';
   } else if (isPriority) {
     level = 'PRIORITY';
+  } else if (
+    input.missingDataWarnings &&
+    input.missingDataWarnings.length > 0
+  ) {
+    // Safety bias (Finding C4 & Clinical Rule 5): Missing vital data raises ROUTINE to PRIORITY
+    level = 'PRIORITY';
+    reasons.push(
+      'Safety bias escalation: missing or incomplete vital data requires clinical assessment',
+    );
   }
 
   // 6. Waiting time escalation

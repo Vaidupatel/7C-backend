@@ -3,6 +3,7 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import * as argon2 from 'argon2';
 import * as crypto from 'crypto';
 import 'dotenv/config';
+import { getHospitalDayBoundaries } from './common/utils/age.util.js';
 
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) {
@@ -548,6 +549,7 @@ async function seed() {
 
   // 6. Five Synthetic Demo Patients (Section 9/10 OPD Demo Flow)
   const now = new Date();
+  const { visitDay } = getHospitalDayBoundaries(now);
 
   // Demo Patient 1: Newborn (Routine Checkup)
   const p1 = await prisma.patient.upsert({
@@ -566,9 +568,9 @@ async function seed() {
 
   await prisma.visit.upsert({
     where: {
-      hospitalId_visitDate_tokenNumber: {
+      hospitalId_visitDay_tokenNumber: {
         hospitalId: hospital.id,
-        visitDate: now,
+        visitDay,
         tokenNumber: 1,
       },
     },
@@ -577,6 +579,7 @@ async function seed() {
       patientId: p1.id,
       hospitalId: hospital.id,
       visitDate: now,
+      visitDay,
       tokenNumber: 1,
       visitType: 'NEW',
       status: 'REGISTERED',
@@ -607,9 +610,9 @@ async function seed() {
 
   const v2 = await prisma.visit.upsert({
     where: {
-      hospitalId_visitDate_tokenNumber: {
+      hospitalId_visitDay_tokenNumber: {
         hospitalId: hospital.id,
-        visitDate: now,
+        visitDay,
         tokenNumber: 2,
       },
     },
@@ -618,6 +621,7 @@ async function seed() {
       patientId: p2.id,
       hospitalId: hospital.id,
       visitDate: now,
+      visitDay,
       tokenNumber: 2,
       visitType: 'NEW',
       status: 'WAITING_DOCTOR',
@@ -670,9 +674,9 @@ async function seed() {
 
   const v3 = await prisma.visit.upsert({
     where: {
-      hospitalId_visitDate_tokenNumber: {
+      hospitalId_visitDay_tokenNumber: {
         hospitalId: hospital.id,
-        visitDate: now,
+        visitDay,
         tokenNumber: 3,
       },
     },
@@ -681,6 +685,7 @@ async function seed() {
       patientId: p3.id,
       hospitalId: hospital.id,
       visitDate: now,
+      visitDay,
       tokenNumber: 3,
       visitType: 'NEW',
       status: 'WAITING_DOCTOR',
@@ -729,9 +734,9 @@ async function seed() {
 
   const v4 = await prisma.visit.upsert({
     where: {
-      hospitalId_visitDate_tokenNumber: {
+      hospitalId_visitDay_tokenNumber: {
         hospitalId: hospital.id,
-        visitDate: now,
+        visitDay,
         tokenNumber: 4,
       },
     },
@@ -740,6 +745,7 @@ async function seed() {
       patientId: p4.id,
       hospitalId: hospital.id,
       visitDate: now,
+      visitDay,
       tokenNumber: 4,
       visitType: 'NEW',
       status: 'WAITING_DOCTOR',
@@ -794,9 +800,9 @@ async function seed() {
 
   const v5 = await prisma.visit.upsert({
     where: {
-      hospitalId_visitDate_tokenNumber: {
+      hospitalId_visitDay_tokenNumber: {
         hospitalId: hospital.id,
-        visitDate: now,
+        visitDay,
         tokenNumber: 5,
       },
     },
@@ -805,6 +811,7 @@ async function seed() {
       patientId: p5.id,
       hospitalId: hospital.id,
       visitDate: now,
+      visitDay,
       tokenNumber: 5,
       visitType: 'FOLLOW_UP',
       status: 'WAITING_DOCTOR',

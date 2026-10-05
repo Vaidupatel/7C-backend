@@ -8,7 +8,11 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
 import { CreatePatientDto } from './dto/create-patient.dto.js';
 import { CreateVisitDto } from './dto/create-visit.dto.js';
-import { calculateAge, AgeResult } from '../common/utils/age.util.js';
+import {
+  calculateAge,
+  AgeResult,
+  getHospitalDayBoundaries,
+} from '../common/utils/age.util.js';
 import { VisitType, VisitStatus } from '../generated/prisma/enums.js';
 import type { Prisma } from '../generated/prisma/client.js';
 
@@ -158,11 +162,16 @@ export class ReceptionService {
       });
     }
 
-    const year = new Date().getFullYear();
-    const count = await this.prisma.patient.count({ where: { hospitalId } });
-    const uhid = `7C-${year}-${String(count + 1).padStart(5, '0')}`;
+    const { year, visitDay } = getHospitalDayBoundaries();
 
     const result = await this.prisma.$transaction(async (tx) => {
+      // D1 fix: Concurrency-safe UHID generation using transaction-level advisory lock
+      const uhidLockKey = `uhid_${hospitalId}_${year}`;
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${uhidLockKey})::bigint)`;
+
+      const count = await tx.patient.count({ where: { hospitalId } });
+      const uhid = `7C-${year}-${String(count + 1).padStart(5, '0')}`;
+
       // 1. Create Guardian
       const guardian = await tx.guardian.create({
         data: {
@@ -178,14 +187,14 @@ export class ReceptionService {
         },
       });
 
-      // 2. Create Patient
+      // 2. Create Patient (D3: No hazardous default 40 for gestationalAgeWeeks)
       const patient = await tx.patient.create({
         data: {
           uhid,
           name: dto.name.trim(),
           dob,
           sex: dto.sex,
-          gestationalAgeWeeks: dto.gestationalAgeWeeks ?? 40,
+          gestationalAgeWeeks: dto.gestationalAgeWeeks ?? null,
           birthWeightKg: dto.birthWeightKg,
           bloodGroup: dto.bloodGroup,
           hospitalId,
@@ -225,6 +234,7 @@ export class ReceptionService {
           data: {
             patientId: patient.id,
             hospitalId,
+            visitDay,
             tokenNumber,
             visitType: VisitType.NEW,
             status: VisitStatus.REGISTERED,
@@ -286,6 +296,8 @@ export class ReceptionService {
     const visitType =
       patient.visits.length > 0 ? VisitType.FOLLOW_UP : VisitType.NEW;
 
+    const { visitDay } = getHospitalDayBoundaries();
+
     const result = await this.prisma.$transaction(async (tx) => {
       const tokenNumber = await this.getNextTokenNumber(hospitalId, tx);
 
@@ -293,6 +305,7 @@ export class ReceptionService {
         data: {
           patientId: patient.id,
           hospitalId,
+          visitDay,
           tokenNumber,
           visitType,
           status: VisitStatus.REGISTERED,
@@ -347,11 +360,14 @@ export class ReceptionService {
         },
         allergies: true,
         visits: {
-          include: {
-            anthropometry: true,
-            vitals: true,
-            triageResult: true,
-            priorityOverrides: true,
+          select: {
+            id: true,
+            visitDate: true,
+            tokenNumber: true,
+            visitType: true,
+            status: true,
+            complaintText: true,
+            createdAt: true,
           },
           orderBy: { visitDate: 'desc' },
         },
@@ -375,13 +391,12 @@ export class ReceptionService {
   }
 
   async getTodayVisits(hospitalId: string) {
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
+    const { visitDay } = getHospitalDayBoundaries();
 
     const visits = await this.prisma.visit.findMany({
       where: {
         hospitalId,
-        visitDate: { gte: todayStart },
+        visitDay,
       },
       include: {
         patient: {
@@ -393,8 +408,6 @@ export class ReceptionService {
             allergies: true,
           },
         },
-        anthropometry: true,
-        triageResult: true,
       },
       orderBy: { tokenNumber: 'asc' },
     });
@@ -420,25 +433,19 @@ export class ReceptionService {
         primaryGuardianPhone: v.patient.guardians[0]?.guardian.phone,
         allergies: v.patient.allergies,
       },
-      anthropometry: v.anthropometry,
-      triageLevel: v.triageResult?.level ?? 'ROUTINE',
     }));
   }
 
   /**
    * Concurrency-safe daily token generator inside transaction
+   * Uses Asia/Kolkata hospital day boundaries and transaction-level advisory locking
    */
   private async getNextTokenNumber(
     hospitalId: string,
     tx: Prisma.TransactionClient,
   ): Promise<number> {
-    const startOfDay = new Date();
-    startOfDay.setHours(0, 0, 0, 0);
+    const { visitDay, dateStr } = getHospitalDayBoundaries();
 
-    const endOfDay = new Date();
-    endOfDay.setHours(23, 59, 59, 999);
-
-    const dateStr = startOfDay.toISOString().slice(0, 10);
     const lockKey = `token_${hospitalId}_${dateStr}`;
     // Acquire PostgreSQL transaction-level advisory lock hashed on hospital and date
     // to strictly serialize concurrent token allocations without table deadlocks
@@ -447,7 +454,7 @@ export class ReceptionService {
     const lastVisit = await tx.visit.findFirst({
       where: {
         hospitalId,
-        visitDate: { gte: startOfDay, lte: endOfDay },
+        visitDay,
       },
       orderBy: { tokenNumber: 'desc' },
       select: { tokenNumber: true },
