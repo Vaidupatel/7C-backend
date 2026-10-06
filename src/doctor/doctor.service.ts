@@ -6,6 +6,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service.js';
 import { OverridePriorityDto } from './dto/override-priority.dto.js';
 import { TriageLevel, VisitStatus } from '../generated/prisma/enums.js';
+import { calculateAge } from '../common/utils/age.util.js';
 
 @Injectable()
 export class DoctorService {
@@ -235,7 +236,23 @@ export class DoctorService {
       throw new ForbiddenException('Access denied to other hospital data');
     }
 
-    return patient;
+    const visitsWithAge = patient.visits.map((v) => {
+      const ageResult = calculateAge(
+        patient.dob,
+        v.visitDate,
+        patient.gestationalAgeWeeks ?? undefined,
+      );
+      return {
+        ...v,
+        ageMonths: Math.round(ageResult.totalMonths * 10) / 10,
+        formattedAge: ageResult.formattedAge,
+      };
+    });
+
+    return {
+      ...patient,
+      visits: visitsWithAge,
+    };
   }
 
   /**

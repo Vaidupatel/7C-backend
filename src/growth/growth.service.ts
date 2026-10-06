@@ -22,6 +22,9 @@ import { CDC_REFERENCE_DATA, getBuiltinLms } from './cdc-reference-data.js';
 
 export interface CurvePoint {
   ageMonths: number;
+  l?: number;
+  m?: number;
+  s?: number;
   p3: number;
   p5: number;
   p10: number;
@@ -279,6 +282,9 @@ export class GrowthService {
       const lms: LmsParams = { l: item.l, m: item.m, s: item.s };
       return {
         ageMonths: item.ageMonths,
+        l: item.l,
+        m: item.m,
+        s: item.s,
         p3: item.p3 ?? calculateLmsValue(-1.881, lms),
         p5: item.p5 ?? calculateLmsValue(-1.645, lms),
         p10: item.p10 ?? calculateLmsValue(-1.282, lms),
