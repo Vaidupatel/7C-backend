@@ -511,42 +511,6 @@ async function seed() {
     }
   }
 
-  // 5. CDC Test Vector Seed: 9-month-old boy weight-for-age from CDC's data files (Plan 3.2, 54)
-  // L = -0.1600954, M = 9.476500305, S = 0.11218624
-  await prisma.growthReference.upsert({
-    where: {
-      standard_measure_sex_ageMonths: {
-        standard: 'CDC',
-        measure: 'WEIGHT_FOR_AGE',
-        sex: 'MALE',
-        ageMonths: 9.0,
-      },
-    },
-    update: {},
-    create: {
-      standard: 'CDC',
-      measure: 'WEIGHT_FOR_AGE',
-      sex: 'MALE',
-      ageMonths: 9.0,
-      l: -0.1600954,
-      m: 9.476500305,
-      s: 0.11218624,
-      p3: 7.54,
-      p5: 7.9,
-      p10: 8.25,
-      p25: 8.85,
-      p50: 9.48,
-      p75: 10.15,
-      p90: 10.82,
-      p95: 11.23,
-      p97: 11.51,
-      sourceUrl:
-        'https://www.cdc.gov/growthcharts/percentile_data_files.htm (wtageinf.csv)',
-      checksum: 'cdc-may-2000-wtageinf-9mo-boy',
-      version: '2000-05-30',
-    },
-  });
-
   // 6. Five Synthetic Demo Patients (Section 9/10 OPD Demo Flow)
   const now = new Date();
   const { visitDay } = getHospitalDayBoundaries(now);

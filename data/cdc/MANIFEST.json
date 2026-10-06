@@ -1,0 +1,162 @@
+[
+  {
+    "fileName": "wtageinf.csv",
+    "url": "https://www.cdc.gov/growthcharts/data/zscore/wtageinf.csv",
+    "standard": "CDC",
+    "measure": "WEIGHT_FOR_AGE",
+    "version": "2000-05-30",
+    "sha256": "73221dd4de82eb9a70c1e6dd45c9b9e285fa1a3d7fff4971c3b85c1be6e5feed",
+    "sizeBytes": 11446,
+    "downloadedAt": "2026-10-06T16:11:22.965Z",
+    "rowCount": 76
+  },
+  {
+    "fileName": "lenageinf.csv",
+    "url": "https://www.cdc.gov/growthcharts/data/zscore/lenageinf.csv",
+    "standard": "CDC",
+    "measure": "LENGTH_FOR_AGE",
+    "version": "2000-05-30",
+    "sha256": "a334b86bc0ecde80d12cdc172dde17b4390ca53ac372b26dd0d72d8502ac2687",
+    "sizeBytes": 11232,
+    "downloadedAt": "2026-10-06T16:11:24.052Z",
+    "rowCount": 74
+  },
+  {
+    "fileName": "hcageinf.csv",
+    "url": "https://www.cdc.gov/growthcharts/data/zscore/hcageinf.csv",
+    "standard": "CDC",
+    "measure": "HEAD_CIRCUMFERENCE_FOR_AGE",
+    "version": "2000-05-30",
+    "sha256": "bf7e2d7af8fdb336f0b159e480414842136da960ea6a730b7e73d1060b4549e9",
+    "sizeBytes": 11486,
+    "downloadedAt": "2026-10-06T16:11:24.692Z",
+    "rowCount": 76
+  },
+  {
+    "fileName": "wtleninf.csv",
+    "url": "https://www.cdc.gov/growthcharts/data/zscore/wtleninf.csv",
+    "standard": "CDC",
+    "measure": "WEIGHT_FOR_LENGTH",
+    "version": "2000-05-30",
+    "sha256": "3dd616c8d11ad8ad5470929477609e6fc44cb2e5f7b95494061e1413a0034249",
+    "sizeBytes": 18242,
+    "downloadedAt": "2026-10-06T16:11:25.357Z",
+    "rowCount": 120
+  },
+  {
+    "fileName": "wtage.csv",
+    "url": "https://www.cdc.gov/growthcharts/data/zscore/wtage.csv",
+    "standard": "CDC",
+    "measure": "WEIGHT_FOR_AGE",
+    "version": "2000-05-30",
+    "sha256": "3406c9d125bcb69c062a9e84eb8c0209bfe9346542bdc1d308643750dcc241b7",
+    "sizeBytes": 66456,
+    "downloadedAt": "2026-10-06T16:11:27.698Z",
+    "rowCount": 436
+  },
+  {
+    "fileName": "statage.csv",
+    "url": "https://www.cdc.gov/growthcharts/data/zscore/statage.csv",
+    "standard": "CDC",
+    "measure": "STATURE_FOR_AGE",
+    "version": "2000-05-30",
+    "sha256": "45130d2a9d7c50c54a47e7ba626b66c61d4554bc2d901198cedd9419a53f7251",
+    "sizeBytes": 66087,
+    "downloadedAt": "2026-10-06T16:11:29.315Z",
+    "rowCount": 436
+  },
+  {
+    "fileName": "bmiagerev.csv",
+    "url": "https://www.cdc.gov/growthcharts/data/zscore/bmiagerev.csv",
+    "standard": "CDC",
+    "measure": "BMI_FOR_AGE",
+    "version": "2000-05-30",
+    "sha256": "cbeea0e8d500ee15c652f3fdc45bcd02cb9c15d4d1e86f4d8048bbfea8d166e5",
+    "sizeBytes": 72022,
+    "downloadedAt": "2026-10-06T16:11:30.908Z",
+    "rowCount": 438
+  },
+  {
+    "fileName": "wtstat.csv",
+    "url": "https://www.cdc.gov/growthcharts/data/zscore/wtstat.csv",
+    "standard": "CDC",
+    "measure": "WEIGHT_FOR_STATURE",
+    "version": "2000-05-30",
+    "sha256": "0f75b6ef7ac725c311bd3ff9d50c5b3b415b7faa00c99126b04f4f9a1c773db3",
+    "sizeBytes": 15145,
+    "downloadedAt": "2026-10-06T16:11:31.344Z",
+    "rowCount": 92
+  },
+  {
+    "fileName": "WHO-Boys-Weight-for-age-Percentiles.csv",
+    "url": "https://ftp.cdc.gov/pub/Health_Statistics/NCHS/growthcharts/WHO-Boys-Weight-for-age-Percentiles.csv",
+    "standard": "WHO",
+    "measure": "WEIGHT_FOR_AGE",
+    "sex": "MALE",
+    "version": "2006-04-27",
+    "sha256": "6fcb43be71ced3fb068d992a86f2a50ef7bb4c2b615b4554e67b6371578d0d7f",
+    "sizeBytes": 2682,
+    "downloadedAt": "2026-10-06T16:11:33.605Z",
+    "rowCount": 25
+  },
+  {
+    "fileName": "WHO-Girls-Weight-for-age-Percentiles.csv",
+    "url": "https://ftp.cdc.gov/pub/Health_Statistics/NCHS/growthcharts/WHO-Girls-Weight-for-age%20Percentiles.csv",
+    "standard": "WHO",
+    "measure": "WEIGHT_FOR_AGE",
+    "sex": "FEMALE",
+    "version": "2006-04-27",
+    "sha256": "00a152538466f649d58d66665e8f1fc0ab25bc3157c4706197eb772925ef7cae",
+    "sizeBytes": 2738,
+    "downloadedAt": "2026-10-06T16:11:34.621Z",
+    "rowCount": 25
+  },
+  {
+    "fileName": "WHO-Boys-Length-for-age-Percentiles.csv",
+    "url": "https://ftp.cdc.gov/pub/Health_Statistics/NCHS/growthcharts/WHO-Boys-Length-for-age-Percentiles.csv",
+    "standard": "WHO",
+    "measure": "LENGTH_FOR_AGE",
+    "sex": "MALE",
+    "version": "2006-04-27",
+    "sha256": "42df3d55815c8f55bd64bffdda466913a24caeed6a9b3c7c651569a45b20d6f9",
+    "sizeBytes": 2576,
+    "downloadedAt": "2026-10-06T16:11:34.985Z",
+    "rowCount": 25
+  },
+  {
+    "fileName": "WHO-Girls-Length-for-age-Percentiles.csv",
+    "url": "https://ftp.cdc.gov/pub/Health_Statistics/NCHS/growthcharts/WHO-Girls-Length-for-age-Percentiles.csv",
+    "standard": "WHO",
+    "measure": "LENGTH_FOR_AGE",
+    "sex": "FEMALE",
+    "version": "2006-04-27",
+    "sha256": "1b06300e72c137078e6fbed4a52238c04e2a3c445665e7f739ae62f34c294911",
+    "sizeBytes": 2671,
+    "downloadedAt": "2026-10-06T16:11:35.699Z",
+    "rowCount": 25
+  },
+  {
+    "fileName": "WHO-Boys-Head-Circumference-for-age-Percentiles.csv",
+    "url": "https://ftp.cdc.gov/pub/Health_Statistics/NCHS/growthcharts/WHO-Boys-Head-Circumference-for-age-Percentiles.csv",
+    "standard": "WHO",
+    "measure": "HEAD_CIRCUMFERENCE_FOR_AGE",
+    "sex": "MALE",
+    "version": "2006-04-27",
+    "sha256": "5af6d648fb119568016fcdc7c53a61687a9cd9093ba100fe44bc0ddf7f5bf8fb",
+    "sizeBytes": 2638,
+    "downloadedAt": "2026-10-06T16:11:36.678Z",
+    "rowCount": 25
+  },
+  {
+    "fileName": "WHO-Girls-Head-Circumference-for-age-Percentiles.csv",
+    "url": "https://ftp.cdc.gov/pub/Health_Statistics/NCHS/growthcharts/WHO-Girls-Head-Circumference-for-age-Percentiles.csv",
+    "standard": "WHO",
+    "measure": "HEAD_CIRCUMFERENCE_FOR_AGE",
+    "sex": "FEMALE",
+    "version": "2006-04-27",
+    "sha256": "8e95121c0bf437cda44bf6de168a2672c8a387d8343f4001c0dc5afb71b0bcc3",
+    "sizeBytes": 2638,
+    "downloadedAt": "2026-10-06T16:11:37.277Z",
+    "rowCount": 25
+  }
+]

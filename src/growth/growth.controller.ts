@@ -7,8 +7,12 @@ import {
   HttpCode,
   HttpStatus,
   BadRequestException,
+  NotFoundException,
 } from '@nestjs/common';
-import { GrowthService } from './growth.service.js';
+import {
+  GrowthService,
+  GrowthDataUnavailableException,
+} from './growth.service.js';
 import { EvaluateGrowthDto } from './dto/evaluate-growth.dto.js';
 import { Roles } from '../auth/decorators/roles.decorator.js';
 import {
@@ -24,7 +28,7 @@ export class GrowthController {
 
   @Get('chart-curves')
   @Roles(Role.DOCTOR, Role.MEDICAL_OFFICER)
-  getChartCurves(
+  async getChartCurves(
     @Query('measure') measure: GrowthMeasure,
     @Query('sex') sex: Sex,
     @Query('standard') standard?: GrowthStandard,
@@ -60,6 +64,13 @@ export class GrowthController {
     if (isNaN(ageMonths) || !measure || !sex) {
       throw new BadRequestException('Invalid query parameters');
     }
-    return this.growthService.getLms(standard, measure, sex, ageMonths);
+    try {
+      return await this.growthService.getLms(standard, measure, sex, ageMonths);
+    } catch (err: unknown) {
+      if (err instanceof GrowthDataUnavailableException) {
+        throw new NotFoundException(err.message);
+      }
+      throw err;
+    }
   }
 }
