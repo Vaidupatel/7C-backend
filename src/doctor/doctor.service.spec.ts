@@ -234,4 +234,81 @@ describe('DoctorService - Visit State Machine (F1)', () => {
       });
     });
   });
+
+  describe('getDoctorQueue (F6)', () => {
+    const hospitalId = 'hosp-123';
+
+    it('returns NOT_TRIAGED with score 2500 when visit has no triageResult (safety bias)', async () => {
+      const untriagedVisit = {
+        id: 'v-untriaged',
+        patient: {
+          id: 'p-1',
+          uhid: '7C-2026-00001',
+          name: 'Untriaged Child',
+          dob: new Date('2024-01-01'),
+          sex: 'MALE',
+          allergies: [],
+        },
+        anthropometry: null,
+        vitals: [],
+        signs: [],
+        complaints: [],
+        triageResult: null,
+        priorityOverrides: [],
+        visitType: 'NEW',
+        tokenNumber: 1,
+        status: VisitStatus.WAITING_DOCTOR,
+        createdAt: new Date(),
+      };
+
+      const routineVisit = {
+        id: 'v-routine',
+        patient: {
+          id: 'p-2',
+          uhid: '7C-2026-00002',
+          name: 'Routine Child',
+          dob: new Date('2024-01-01'),
+          sex: 'FEMALE',
+          allergies: [],
+        },
+        anthropometry: null,
+        vitals: [],
+        signs: [],
+        complaints: [],
+        triageResult: {
+          level: 'ROUTINE',
+          score: 1000,
+          reasons: ['Normal vitals'],
+          configVersion: '2026.1-peds-opd',
+        },
+        priorityOverrides: [],
+        visitType: 'NEW',
+        tokenNumber: 2,
+        status: VisitStatus.WAITING_DOCTOR,
+        createdAt: new Date(),
+      };
+
+      mockPrismaService.visit.findMany.mockResolvedValueOnce([
+        untriagedVisit,
+        routineVisit,
+      ]);
+
+      const queue = await service.getDoctorQueue(hospitalId);
+
+      expect(queue).toHaveLength(2);
+      const untriaged = queue.find((q) => q.visitId === 'v-untriaged');
+      expect(untriaged).toBeDefined();
+      expect(untriaged?.effectiveLevel).toBe('NOT_TRIAGED');
+      expect(untriaged?.originalLevel).toBe('NOT_TRIAGED');
+      expect(untriaged?.score).toBe(2500);
+      expect(untriaged?.reasons).toContain(
+        'Pending clinical vitals & triage evaluation',
+      );
+
+      // Verify NOT_TRIAGED (score 2500) sorts above ROUTINE (score 1000)
+      const routine = queue.find((q) => q.visitId === 'v-routine');
+      expect(routine?.score).toBe(1000);
+      expect(untriaged?.score).toBeGreaterThan(routine!.score);
+    });
+  });
 });

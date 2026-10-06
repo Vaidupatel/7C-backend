@@ -93,9 +93,14 @@ export class DoctorService {
 
       // Latest override if present
       const latestOverride = v.priorityOverrides[0];
-      const effectiveLevel: TriageLevel = latestOverride
+      const hasTriage = !!v.triageResult;
+      const originalLevel: TriageLevel | 'NOT_TRIAGED' = hasTriage
+        ? v.triageResult!.level
+        : 'NOT_TRIAGED';
+
+      const effectiveLevel: TriageLevel | 'NOT_TRIAGED' = latestOverride
         ? latestOverride.overrideLevel
-        : v.triageResult?.level || TriageLevel.ROUTINE;
+        : originalLevel;
 
       // Extract reasons safely from json
       const rawReasons = v.triageResult?.reasons;
@@ -103,16 +108,28 @@ export class DoctorService {
         ? (rawReasons as string[])
         : [];
 
+      if (!hasTriage && !latestOverride) {
+        reasons.push('Pending clinical vitals & triage evaluation');
+      }
+
       if (latestOverride) {
         reasons.unshift(
           `Clinician override: ${latestOverride.overrideLevel} (${latestOverride.reason})`,
         );
       }
 
-      // Numerical score for sorting
-      let sortScore = v.triageResult?.score || 1000;
+      // Numerical score for sorting:
+      // EMERGENCY: >= 3000
+      // NOT_TRIAGED: 2500 (Safety bias: sorted above ROUTINE so clinician is alerted)
+      // PRIORITY: >= 2000
+      // ROUTINE: >= 1000
+      let sortScore =
+        v.triageResult?.score ||
+        (effectiveLevel === 'NOT_TRIAGED' ? 2500 : 1000);
       if (effectiveLevel === TriageLevel.EMERGENCY) {
         sortScore = Math.max(sortScore, 3000);
+      } else if (effectiveLevel === 'NOT_TRIAGED') {
+        sortScore = 2500;
       } else if (effectiveLevel === TriageLevel.PRIORITY) {
         sortScore = Math.max(sortScore, 2000);
       }
@@ -130,7 +147,7 @@ export class DoctorService {
         createdAt: v.createdAt,
         waitingMinutes: waitMinutes,
         effectiveLevel,
-        originalLevel: v.triageResult?.level || TriageLevel.ROUTINE,
+        originalLevel,
         isOverridden: !!latestOverride,
         score: sortScore,
         reasons,
