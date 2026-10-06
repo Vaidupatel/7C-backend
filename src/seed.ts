@@ -3,7 +3,6 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import * as argon2 from 'argon2';
 import * as crypto from 'crypto';
 import 'dotenv/config';
-import { getHospitalDayBoundaries } from './common/utils/age.util.js';
 
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) {
@@ -30,6 +29,19 @@ async function seed() {
   console.log(`Hospital ready: ${hospital.name} (${hospital.id})`);
 
   // 2. Passwords (Security Checklist 30)
+  if (process.env.NODE_ENV === 'production') {
+    if (
+      !process.env.INITIAL_ADMIN_PASSWORD ||
+      !process.env.DEMO_DOCTOR_PASSWORD ||
+      !process.env.DEMO_RECEPTION_PASSWORD ||
+      !process.env.DEMO_MO_PASSWORD
+    ) {
+      throw new Error(
+        'Refusing to seed in production without explicit strong passwords for all staff accounts in environment variables!',
+      );
+    }
+  }
+
   const adminPassword =
     process.env.INITIAL_ADMIN_PASSWORD ||
     crypto.randomBytes(12).toString('base64');
@@ -511,306 +523,7 @@ async function seed() {
     }
   }
 
-  // 6. Five Synthetic Demo Patients (Section 9/10 OPD Demo Flow)
-  const now = new Date();
-  const { visitDay } = getHospitalDayBoundaries(now);
-
-  // Demo Patient 1: Newborn (Routine Checkup)
-  const p1 = await prisma.patient.upsert({
-    where: { uhid: 'PEDS-2026-0001' },
-    update: {},
-    create: {
-      uhid: 'PEDS-2026-0001',
-      name: 'Baby Aarav Patel',
-      dob: new Date(now.getTime() - 5 * 24 * 3600 * 1000),
-      sex: 'MALE',
-      hospitalId: hospital.id,
-      gestationalAgeWeeks: 39,
-      birthWeightKg: 3.2,
-    },
-  });
-
-  await prisma.visit.upsert({
-    where: {
-      hospitalId_visitDay_tokenNumber: {
-        hospitalId: hospital.id,
-        visitDay,
-        tokenNumber: 1,
-      },
-    },
-    update: {},
-    create: {
-      patientId: p1.id,
-      hospitalId: hospital.id,
-      visitDate: now,
-      visitDay,
-      tokenNumber: 1,
-      visitType: 'NEW',
-      status: 'REGISTERED',
-      complaintText: 'Routine neonatal checkup',
-      anthropometry: {
-        create: {
-          weightKg: 3.2,
-          lengthOrStatureCm: 50.0,
-          headCircumferenceCm: 34.5,
-          measurementMethod: 'RECUMBENT',
-        },
-      },
-    },
-  });
-
-  // Demo Patient 2: Infant with respiratory red flag (Emergency)
-  const p2 = await prisma.patient.upsert({
-    where: { uhid: 'PEDS-2026-0002' },
-    update: {},
-    create: {
-      uhid: 'PEDS-2026-0002',
-      name: 'Mira Sharma',
-      dob: new Date(now.getTime() - 8 * 30.4375 * 24 * 3600 * 1000),
-      sex: 'FEMALE',
-      hospitalId: hospital.id,
-    },
-  });
-
-  const v2 = await prisma.visit.upsert({
-    where: {
-      hospitalId_visitDay_tokenNumber: {
-        hospitalId: hospital.id,
-        visitDay,
-        tokenNumber: 2,
-      },
-    },
-    update: {},
-    create: {
-      patientId: p2.id,
-      hospitalId: hospital.id,
-      visitDate: now,
-      visitDay,
-      tokenNumber: 2,
-      visitType: 'NEW',
-      status: 'WAITING_DOCTOR',
-      complaintText: 'Severe cough and difficulty breathing',
-      anthropometry: {
-        create: {
-          weightKg: 7.8,
-          lengthOrStatureCm: 67.5,
-          headCircumferenceCm: 43.0,
-          measurementMethod: 'RECUMBENT',
-        },
-      },
-      vitals: {
-        create: {
-          heartRateBpm: 175,
-          respiratoryRateBpm: 58,
-          spo2Percent: 88.0,
-          temperatureC: 38.8,
-          capillaryRefillSec: 2.5,
-          avpu: 'ALERT',
-        },
-      },
-      triageResult: {
-        create: {
-          level: 'EMERGENCY',
-          score: 3250,
-          reasons: [
-            'Emergency red flag sign: Stridor in calm child',
-            'Critical vital: Severe hypoxemia (SpO2 88% < 90%)',
-          ],
-          configVersion: '2026.1-peds-opd',
-        },
-      },
-    },
-  });
-  void v2;
-
-  // Demo Patient 3: Toddler with low weight-for-age (Priority)
-  const p3 = await prisma.patient.upsert({
-    where: { uhid: 'PEDS-2026-0003' },
-    update: {},
-    create: {
-      uhid: 'PEDS-2026-0003',
-      name: 'Kabir Joshi',
-      dob: new Date(now.getTime() - 18 * 30.4375 * 24 * 3600 * 1000),
-      sex: 'MALE',
-      hospitalId: hospital.id,
-    },
-  });
-
-  const v3 = await prisma.visit.upsert({
-    where: {
-      hospitalId_visitDay_tokenNumber: {
-        hospitalId: hospital.id,
-        visitDay,
-        tokenNumber: 3,
-      },
-    },
-    update: {},
-    create: {
-      patientId: p3.id,
-      hospitalId: hospital.id,
-      visitDate: now,
-      visitDay,
-      tokenNumber: 3,
-      visitType: 'NEW',
-      status: 'WAITING_DOCTOR',
-      complaintText: 'Poor weight gain and lethargy',
-      anthropometry: {
-        create: {
-          weightKg: 7.4,
-          lengthOrStatureCm: 76.0,
-          headCircumferenceCm: 45.0,
-          measurementMethod: 'RECUMBENT',
-        },
-      },
-      vitals: {
-        create: {
-          heartRateBpm: 110,
-          respiratoryRateBpm: 28,
-          spo2Percent: 98.0,
-          temperatureC: 36.8,
-          avpu: 'ALERT',
-        },
-      },
-      triageResult: {
-        create: {
-          level: 'PRIORITY',
-          score: 2150,
-          reasons: ['Growth alert: Underweight (Z < -2 or < 5th %ile)'],
-          configVersion: '2026.1-peds-opd',
-        },
-      },
-    },
-  });
-  void v3;
-
-  // Demo Patient 4: School-age child with fever (Routine)
-  const p4 = await prisma.patient.upsert({
-    where: { uhid: 'PEDS-2026-0004' },
-    update: {},
-    create: {
-      uhid: 'PEDS-2026-0004',
-      name: 'Diya Verma',
-      dob: new Date(now.getTime() - 7 * 365 * 24 * 3600 * 1000),
-      sex: 'FEMALE',
-      hospitalId: hospital.id,
-    },
-  });
-
-  const v4 = await prisma.visit.upsert({
-    where: {
-      hospitalId_visitDay_tokenNumber: {
-        hospitalId: hospital.id,
-        visitDay,
-        tokenNumber: 4,
-      },
-    },
-    update: {},
-    create: {
-      patientId: p4.id,
-      hospitalId: hospital.id,
-      visitDate: now,
-      visitDay,
-      tokenNumber: 4,
-      visitType: 'NEW',
-      status: 'WAITING_DOCTOR',
-      complaintText: 'Mild fever and body ache',
-      anthropometry: {
-        create: {
-          weightKg: 22.0,
-          lengthOrStatureCm: 122.0,
-          measurementMethod: 'STANDING',
-        },
-      },
-      vitals: {
-        create: {
-          heartRateBpm: 92,
-          respiratoryRateBpm: 20,
-          spo2Percent: 99.0,
-          temperatureC: 38.1,
-          avpu: 'ALERT',
-        },
-      },
-      triageResult: {
-        create: {
-          level: 'ROUTINE',
-          score: 1040,
-          reasons: ['Mild fever (38.1°C), normal vitals and no red flags'],
-          configVersion: '2026.1-peds-opd',
-        },
-      },
-    },
-  });
-  void v4;
-
-  // Demo Patient 5: Returning follow-up patient with documented allergy
-  const p5 = await prisma.patient.upsert({
-    where: { uhid: 'PEDS-2026-0005' },
-    update: {},
-    create: {
-      uhid: 'PEDS-2026-0005',
-      name: 'Rohan Nair',
-      dob: new Date(now.getTime() - 3 * 365 * 24 * 3600 * 1000),
-      sex: 'MALE',
-      hospitalId: hospital.id,
-      allergies: {
-        create: {
-          allergen: 'Peanuts / Groundnuts',
-          reaction: 'Anaphylaxis / Acute Urticaria',
-          severity: 'LIFE_THREATENING',
-        },
-      },
-    },
-  });
-
-  const v5 = await prisma.visit.upsert({
-    where: {
-      hospitalId_visitDay_tokenNumber: {
-        hospitalId: hospital.id,
-        visitDay,
-        tokenNumber: 5,
-      },
-    },
-    update: {},
-    create: {
-      patientId: p5.id,
-      hospitalId: hospital.id,
-      visitDate: now,
-      visitDay,
-      tokenNumber: 5,
-      visitType: 'FOLLOW_UP',
-      status: 'WAITING_DOCTOR',
-      complaintText: 'Follow-up consultation after allergic reaction episode',
-      anthropometry: {
-        create: {
-          weightKg: 14.8,
-          lengthOrStatureCm: 96.0,
-          measurementMethod: 'STANDING',
-        },
-      },
-      vitals: {
-        create: {
-          heartRateBpm: 98,
-          respiratoryRateBpm: 22,
-          spo2Percent: 98.0,
-          temperatureC: 36.9,
-          avpu: 'ALERT',
-        },
-      },
-      triageResult: {
-        create: {
-          level: 'ROUTINE',
-          score: 1025,
-          reasons: [
-            'Follow-up visit, stable vitals, documented allergy tracked',
-          ],
-          configVersion: '2026.1-peds-opd',
-        },
-      },
-    },
-  });
-  void v5;
-
-  console.log('Seeding completed successfully!');
+  console.log('Foundation seed completed successfully!');
 }
 
 seed()
