@@ -187,6 +187,7 @@ export class DoctorService {
         effectiveLevel,
         originalLevel,
         isOverridden: !!latestOverride,
+        overrideReason: latestOverride?.reason ?? null,
         score: sortScore,
         reasons: reasonLabels,
         structuredReasons,
