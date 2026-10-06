@@ -2,8 +2,11 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
+  ConflictException,
+  BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { AuditService } from '../audit/audit.service.js';
 import { RecordVitalsDto } from './dto/record-vitals.dto.js';
 import { calculateAge } from '../common/utils/age.util.js';
 import { evaluateVitals } from '../common/utils/vitals.util.js';
@@ -16,6 +19,7 @@ export class VitalsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly growthService: GrowthService,
+    private readonly auditService: AuditService,
   ) {}
 
   async getNeedsVitalsQueue(hospitalId: string) {
@@ -45,6 +49,7 @@ export class VitalsService {
     hospitalId: string,
     dto: RecordVitalsDto,
     clinicianId: string,
+    clinicianRole?: string,
   ) {
     const visit = await this.prisma.visit.findUnique({
       where: { id: dto.visitId },
@@ -62,79 +67,63 @@ export class VitalsService {
       throw new ForbiddenException('Access denied to other hospital data');
     }
 
-    // 1. Calculate patient age
-    const ageResult = calculateAge(visit.patient.dob, visit.visitDate);
-    const ageMonths = ageResult.totalMonths;
-
-    // 2. Persist VitalSet
-    const vitalSet = await this.prisma.vitalSet.create({
-      data: {
-        visitId: visit.id,
-        heartRateBpm: dto.heartRateBpm,
-        respiratoryRateBpm: dto.respiratoryRateBpm,
-        bpSystolic: dto.bpSystolic,
-        bpDiastolic: dto.bpDiastolic,
-        spo2Percent: dto.spo2Percent,
-        temperatureC: dto.temperatureC,
-        temperatureSite: dto.temperatureSite,
-        painScore: dto.painScore,
-        capillaryRefillSec: dto.capillaryRefillSec,
-        avpu: dto.avpu,
-        recordedBy: clinicianId,
-      },
-    });
-
-    // 3. Link Complaint if provided
-    if (dto.complaintId) {
-      await this.prisma.visitComplaint.upsert({
-        where: {
-          visitId_complaintId: {
-            visitId: visit.id,
-            complaintId: dto.complaintId,
-          },
-        },
-        update: {},
-        create: {
-          visitId: visit.id,
-          complaintId: dto.complaintId,
-        },
-      });
+    // F5: Only REGISTERED or WAITING_DOCTOR visits can accept vitals
+    if (
+      visit.status !== VisitStatus.REGISTERED &&
+      visit.status !== VisitStatus.WAITING_DOCTOR
+    ) {
+      throw new ConflictException(
+        `Cannot record vitals for visit with status '${visit.status}'. Vitals can only be recorded for visits in REGISTERED or WAITING_DOCTOR status.`,
+      );
     }
 
-    // 4. Link Signs if provided and fetch their details
+    // F5: Validate sign IDs are active and existent (reject 400 on unknown/inactive)
     const selectedSigns: Array<{
       name: string;
       redFlagLevel: 'NONE' | 'PRIORITY' | 'EMERGENCY';
     }> = [];
 
     if (dto.signIds && dto.signIds.length > 0) {
-      const signs = await this.prisma.sign.findMany({
-        where: { id: { in: dto.signIds } },
+      const activeSigns = await this.prisma.sign.findMany({
+        where: {
+          id: { in: dto.signIds },
+          active: true,
+        },
       });
 
-      for (const sign of signs) {
+      if (activeSigns.length !== dto.signIds.length) {
+        const foundIds = new Set(activeSigns.map((s) => s.id));
+        const invalidIds = dto.signIds.filter((id) => !foundIds.has(id));
+        throw new BadRequestException(
+          `One or more sign IDs are invalid or inactive: ${invalidIds.join(', ')}`,
+        );
+      }
+
+      for (const sign of activeSigns) {
         selectedSigns.push({
           name: sign.name,
           redFlagLevel: sign.redFlagLevel,
         });
-
-        await this.prisma.visitSign.upsert({
-          where: {
-            visitId_signId: {
-              visitId: visit.id,
-              signId: sign.id,
-            },
-          },
-          update: {},
-          create: {
-            visitId: visit.id,
-            signId: sign.id,
-          },
-        });
       }
     }
 
-    // 5. Evaluate Vitals
+    // F5: Validate complaint ID if provided
+    if (dto.complaintId) {
+      const activeComplaint = await this.prisma.complaint.findUnique({
+        where: { id: dto.complaintId },
+      });
+      if (!activeComplaint || !activeComplaint.active) {
+        throw new BadRequestException(
+          `Complaint '${dto.complaintId}' is invalid or inactive`,
+        );
+      }
+    }
+
+    // 1. Calculate patient age
+    const ageResult = calculateAge(visit.patient.dob, visit.visitDate);
+    const ageMonths = ageResult.totalMonths;
+
+    // 2. Evaluate Vitals
     const vitalsEval = evaluateVitals({
       ageMonths,
       heartRateBpm: dto.heartRateBpm,
@@ -148,7 +137,7 @@ export class VitalsService {
       avpu: dto.avpu,
     });
 
-    // 6. Growth flags if anthropometry is present
+    // 3. Growth flags if anthropometry is present
     const growthFlags: Array<{
       severity: 'NORMAL' | 'PRIORITY' | 'EMERGENCY';
       label: string;
@@ -184,7 +173,7 @@ export class VitalsService {
       }
     }
 
-    // 7. Calculate Triage
+    // 4. Calculate Triage
     const waitMinutes = Math.floor(
       (Date.now() - new Date(visit.createdAt).getTime()) / 60000,
     );
@@ -198,36 +187,126 @@ export class VitalsService {
       missingDataWarnings: vitalsEval.warnings,
     });
 
-    // 8. Upsert TriageResult
-    const triageResult = await this.prisma.triageResult.upsert({
-      where: { visitId: visit.id },
-      update: {
-        level: triage.level,
-        score: triage.score,
-        reasons: triage.reasons,
-        configVersion: triage.configVersion,
-      },
-      create: {
-        visitId: visit.id,
-        level: triage.level,
-        score: triage.score,
-        reasons: triage.reasons,
-        configVersion: triage.configVersion,
-      },
+    const isReRecord = visit.status === VisitStatus.WAITING_DOCTOR;
+
+    // 5. Transactional execution of all writes (F5)
+    const result = await this.prisma.$transaction(async (tx) => {
+      // If re-recording on a visit that already had vitals, supersede previous records
+      if (isReRecord) {
+        await tx.vitalSet.deleteMany({
+          where: { visitId: visit.id },
+        });
+        await tx.visitSign.deleteMany({
+          where: { visitId: visit.id },
+        });
+        if (dto.complaintId) {
+          await tx.visitComplaint.deleteMany({
+            where: { visitId: visit.id },
+          });
+        }
+      }
+
+      // Persist new VitalSet
+      const vitalSet = await tx.vitalSet.create({
+        data: {
+          visitId: visit.id,
+          heartRateBpm: dto.heartRateBpm,
+          respiratoryRateBpm: dto.respiratoryRateBpm,
+          bpSystolic: dto.bpSystolic,
+          bpDiastolic: dto.bpDiastolic,
+          spo2Percent: dto.spo2Percent,
+          temperatureC: dto.temperatureC,
+          temperatureSite: dto.temperatureSite,
+          painScore: dto.painScore,
+          capillaryRefillSec: dto.capillaryRefillSec,
+          avpu: dto.avpu,
+          recordedBy: clinicianId,
+        },
+      });
+
+      // Link Complaint if provided
+      if (dto.complaintId) {
+        await tx.visitComplaint.upsert({
+          where: {
+            visitId_complaintId: {
+              visitId: visit.id,
+              complaintId: dto.complaintId,
+            },
+          },
+          update: {},
+          create: {
+            visitId: visit.id,
+            complaintId: dto.complaintId,
+          },
+        });
+      }
+
+      // Link Signs if provided
+      if (dto.signIds && dto.signIds.length > 0) {
+        for (const signId of dto.signIds) {
+          await tx.visitSign.upsert({
+            where: {
+              visitId_signId: {
+                visitId: visit.id,
+                signId,
+              },
+            },
+            update: {},
+            create: {
+              visitId: visit.id,
+              signId,
+            },
+          });
+        }
+      }
+
+      // Upsert TriageResult
+      const triageResult = await tx.triageResult.upsert({
+        where: { visitId: visit.id },
+        update: {
+          level: triage.level,
+          score: triage.score,
+          reasons: triage.reasons,
+          configVersion: triage.configVersion,
+        },
+        create: {
+          visitId: visit.id,
+          level: triage.level,
+          score: triage.score,
+          reasons: triage.reasons,
+          configVersion: triage.configVersion,
+        },
+      });
+
+      // Update Visit status to WAITING_DOCTOR
+      await tx.visit.update({
+        where: { id: visit.id },
+        data: {
+          status: VisitStatus.WAITING_DOCTOR,
+          notes: dto.notes ? dto.notes : visit.notes,
+        },
+      });
+
+      return { vitalSet, triageResult };
     });
 
-    // 9. Update Visit status
-    await this.prisma.visit.update({
-      where: { id: visit.id },
-      data: {
-        status: VisitStatus.WAITING_DOCTOR,
-        notes: dto.notes ? dto.notes : visit.notes,
+    await this.auditService.log({
+      userId: clinicianId,
+      userRole: clinicianRole,
+      action: isReRecord ? 'VITALS_RE_RECORDED' : 'VITALS_RECORDED',
+      entityName: 'Visit',
+      entityId: visit.id,
+      details: {
+        visitId: visit.id,
+        isReRecord,
+        triageLevel: triage.level,
+        triageScore: triage.score,
       },
     });
 
     return {
-      vitalSet,
-      triageResult,
+      vitalSet: result.vitalSet,
+      triageResult: result.triageResult,
       vitalsEvaluation: vitalsEval,
     };
   }

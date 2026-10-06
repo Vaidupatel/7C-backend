@@ -30,6 +30,11 @@ export class VitalsController {
     @CurrentUser() user: RequestUser,
     @Body() dto: RecordVitalsDto,
   ) {
-    return this.vitalsService.recordVitals(user.hospitalId, dto, user.userId);
+    return this.vitalsService.recordVitals(
+      user.hospitalId,
+      dto,
+      user.userId,
+      user.role,
+    );
   }
 }
