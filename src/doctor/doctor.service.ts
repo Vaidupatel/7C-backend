@@ -2,15 +2,39 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
+  ConflictException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { AuditService } from '../audit/audit.service.js';
 import { OverridePriorityDto } from './dto/override-priority.dto.js';
 import { TriageLevel, VisitStatus } from '../generated/prisma/enums.js';
 import { calculateAge } from '../common/utils/age.util.js';
 
+export const ALLOWED_VISIT_TRANSITIONS: Record<VisitStatus, VisitStatus[]> = {
+  [VisitStatus.REGISTERED]: [VisitStatus.WAITING_DOCTOR],
+  [VisitStatus.VITALS_DONE]: [
+    VisitStatus.WAITING_DOCTOR,
+    VisitStatus.IN_CONSULTATION,
+    VisitStatus.LEFT_WITHOUT_BEING_SEEN,
+  ],
+  [VisitStatus.WAITING_DOCTOR]: [
+    VisitStatus.IN_CONSULTATION,
+    VisitStatus.LEFT_WITHOUT_BEING_SEEN,
+  ],
+  [VisitStatus.IN_CONSULTATION]: [
+    VisitStatus.COMPLETED,
+    VisitStatus.LEFT_WITHOUT_BEING_SEEN,
+  ],
+  [VisitStatus.COMPLETED]: [],
+  [VisitStatus.LEFT_WITHOUT_BEING_SEEN]: [],
+};
+
 @Injectable()
 export class DoctorService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditService: AuditService,
+  ) {}
 
   async getDoctorQueue(hospitalId: string) {
     const visits = await this.prisma.visit.findMany({
@@ -182,18 +206,16 @@ export class DoctorService {
     // The override is recorded in PriorityOverride table and reflected in effectiveLevel.
 
     // 3. Audit log (without sensitive patient data)
-    await this.prisma.auditLog.create({
-      data: {
-        userId: clinicianId,
-        userRole: 'DOCTOR',
-        action: 'PRIORITY_OVERRIDE',
-        entityName: 'Visit',
-        entityId: visit.id,
-        details: {
-          originalLevel,
-          overrideLevel: dto.overrideLevel,
-          reason: dto.reason,
-        },
+    await this.auditService.log({
+      userId: clinicianId,
+      userRole: 'DOCTOR',
+      action: 'PRIORITY_OVERRIDE',
+      entityName: 'Visit',
+      entityId: visit.id,
+      details: {
+        originalLevel,
+        overrideLevel: dto.overrideLevel,
+        reason: dto.reason,
       },
     });
 
@@ -256,12 +278,14 @@ export class DoctorService {
   }
 
   /**
-   * C7 fix: Visit lifecycle state transitions (IN_CONSULTATION, COMPLETED, LEFT_WITHOUT_BEING_SEEN)
+   * C7 & F1 fix: Visit lifecycle state transitions (IN_CONSULTATION, COMPLETED, LEFT_WITHOUT_BEING_SEEN)
+   * Enforces legal transitions and rejects invalid progression with 409 Conflict.
    */
   async updateVisitStatus(
     hospitalId: string,
     visitId: string,
     clinicianId: string,
+    clinicianRole: string,
     dto: { status: VisitStatus; notes?: string },
   ) {
     const visit = await this.prisma.visit.findUnique({
@@ -273,24 +297,32 @@ export class DoctorService {
     }
 
     const previousStatus = visit.status;
+    const allowed = ALLOWED_VISIT_TRANSITIONS[previousStatus] ?? [];
+
+    if (!allowed.includes(dto.status)) {
+      throw new ConflictException(
+        `Cannot transition visit status from ${previousStatus} to ${dto.status}. Allowed transitions: ${allowed.join(', ') || 'none (terminal status)'}`,
+      );
+    }
 
     const updated = await this.prisma.visit.update({
       where: { id: visitId },
-      data: { status: dto.status },
+      data: {
+        status: dto.status,
+        ...(dto.notes !== undefined ? { notes: dto.notes } : {}),
+      },
     });
 
-    await this.prisma.auditLog.create({
-      data: {
-        userId: clinicianId,
-        userRole: 'DOCTOR',
-        action: 'VISIT_STATUS_TRANSITION',
-        entityName: 'Visit',
-        entityId: visit.id,
-        details: {
-          previousStatus,
-          newStatus: dto.status,
-          notes: dto.notes,
-        },
+    await this.auditService.log({
+      userId: clinicianId,
+      userRole: clinicianRole,
+      action: 'VISIT_STATUS_TRANSITION',
+      entityName: 'Visit',
+      entityId: visit.id,
+      details: {
+        previousStatus,
+        newStatus: dto.status,
+        notes: dto.notes,
       },
     });
 

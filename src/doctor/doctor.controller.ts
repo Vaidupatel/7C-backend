@@ -51,20 +51,21 @@ export class DoctorController {
     return this.doctorService.getPatientDetails(hospitalId, id);
   }
 
-  // C7 fix: Visit lifecycle state transitions (IN_CONSULTATION, COMPLETED, LEFT_WITHOUT_BEING_SEEN)
+  // C7 & F1 fix: Visit lifecycle state transitions (IN_CONSULTATION, COMPLETED, LEFT_WITHOUT_BEING_SEEN)
   @Patch('visits/:id/status')
-  @Roles(Role.DOCTOR, Role.MEDICAL_OFFICER)
+  @Roles(Role.DOCTOR)
   @HttpCode(HttpStatus.OK)
   async updateVisitStatus(
     @CurrentUser('hospitalId') hospitalId: string,
-    @CurrentUser('userId') clinicianId: string,
+    @CurrentUser() user: RequestUser,
     @Param('id') visitId: string,
     @Body() dto: UpdateVisitStatusDto,
   ) {
     return this.doctorService.updateVisitStatus(
       hospitalId,
       visitId,
-      clinicianId,
+      user.userId,
+      user.role,
       dto,
     );
   }
