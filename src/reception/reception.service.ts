@@ -84,7 +84,11 @@ export class ReceptionService {
 
     return patients.map((p) => {
       const primaryG = p.guardians[0]?.guardian;
-      const age = calculateAge(p.dob, new Date(), p.gestationalAgeWeeks ?? 40);
+      const age = calculateAge(
+        p.dob,
+        new Date(),
+        p.gestationalAgeWeeks ?? undefined,
+      );
 
       return {
         id: p.id,
@@ -381,7 +385,7 @@ export class ReceptionService {
     const age = calculateAge(
       patient.dob,
       new Date(),
-      patient.gestationalAgeWeeks ?? 40,
+      patient.gestationalAgeWeeks ?? undefined,
     );
 
     return {
@@ -428,7 +432,7 @@ export class ReceptionService {
         age: calculateAge(
           v.patient.dob,
           v.visitDate,
-          v.patient.gestationalAgeWeeks ?? 40,
+          v.patient.gestationalAgeWeeks ?? undefined,
         ),
         primaryGuardianPhone: v.patient.guardians[0]?.guardian.phone,
         allergies: v.patient.allergies,

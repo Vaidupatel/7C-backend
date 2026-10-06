@@ -7,6 +7,8 @@ import {
   IsString,
   Min,
   Max,
+  Equals,
+  IsInt,
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
@@ -45,9 +47,9 @@ export class GuardianDto {
   @Max(250)
   fatherStatureCm?: number;
 
-  @IsBoolean()
-  @IsOptional()
-  consentGiven: boolean = true;
+  @IsBoolean({ message: 'Consent must be a boolean value' })
+  @Equals(true, { message: 'Consent must be explicitly recorded' })
+  consentGiven!: boolean;
 
   @IsString()
   @IsOptional()
@@ -116,11 +118,11 @@ export class CreatePatientDto {
   @IsEnum(Sex, { message: 'Sex must be either MALE or FEMALE' })
   sex!: Sex;
 
-  @IsNumber()
+  @IsInt({ message: 'Gestational age must be an integer' })
   @IsOptional()
-  @Min(20)
-  @Max(44)
-  gestationalAgeWeeks?: number = 40;
+  @Min(20, { message: 'Gestational age must be at least 20 weeks' })
+  @Max(44, { message: 'Gestational age must not exceed 44 weeks' })
+  gestationalAgeWeeks?: number;
 
   @IsNumber()
   @IsOptional()
