@@ -1,6 +1,6 @@
 import { calculateTriage, TriageInput } from './triage.util.js';
 
-describe('triage.util', () => {
+describe('triage.util (F7)', () => {
   it('returns ROUTINE when all vitals, signs, and growth are normal', () => {
     const input: TriageInput = {
       vitalsSeverity: 'NORMAL',
@@ -12,9 +12,10 @@ describe('triage.util', () => {
     expect(result.level).toBe('ROUTINE');
     expect(result.score).toBeGreaterThanOrEqual(1000);
     expect(result.score).toBeLessThan(2000);
+    expect(result.reasons).toEqual([]);
   });
 
-  it('escalates to EMERGENCY if any emergency sign is present', () => {
+  it('escalates to EMERGENCY if any emergency sign is present and sets source=SIGNS', () => {
     const input: TriageInput = {
       vitalsSeverity: 'NORMAL',
       vitalsReasons: [],
@@ -28,11 +29,16 @@ describe('triage.util', () => {
     expect(result.level).toBe('EMERGENCY');
     expect(result.score).toBeGreaterThanOrEqual(3000);
     expect(
-      result.reasons.some((r) => r.includes('Stridor in calm child')),
+      result.reasons.some(
+        (r) =>
+          r.label.includes('Stridor in calm child') &&
+          r.source === 'SIGNS' &&
+          r.severity === 'EMERGENCY',
+      ),
     ).toBe(true);
   });
 
-  it('escalates to PRIORITY if abnormal vital is present without emergency flags', () => {
+  it('escalates to PRIORITY if abnormal vital is present without emergency flags and sets source=VITALS', () => {
     const input: TriageInput = {
       vitalsSeverity: 'MODERATE',
       vitalsReasons: ['Tachycardia (160 bpm)'],
@@ -43,6 +49,29 @@ describe('triage.util', () => {
     expect(result.level).toBe('PRIORITY');
     expect(result.score).toBeGreaterThanOrEqual(2000);
     expect(result.reasons).toHaveLength(1);
+    expect(result.reasons[0].source).toBe('VITALS');
+    expect(result.reasons[0].severity).toBe('PRIORITY');
+  });
+
+  it('sets source=GROWTH for growth alerts and severe growth flags', () => {
+    const input: TriageInput = {
+      vitalsSeverity: 'NORMAL',
+      vitalsReasons: [],
+      signs: [],
+      growthFlags: [
+        { severity: 'EMERGENCY', label: 'Severe Wasting (Z < -3)' },
+        { severity: 'PRIORITY', label: 'Stunting (< 5th %ile)' },
+      ],
+      waitingMinutes: 10,
+    };
+    const result = calculateTriage(input);
+    expect(result.level).toBe('EMERGENCY');
+    expect(result.score).toBeGreaterThanOrEqual(3000);
+
+    const growthReasons = result.reasons.filter((r) => r.source === 'GROWTH');
+    expect(growthReasons).toHaveLength(2);
+    expect(growthReasons[0].severity).toBe('EMERGENCY');
+    expect(growthReasons[1].severity).toBe('PRIORITY');
   });
 
   it('highest component wins: critical vitals override priority sign to EMERGENCY', () => {
@@ -55,9 +84,11 @@ describe('triage.util', () => {
     const result = calculateTriage(input);
     expect(result.level).toBe('EMERGENCY');
     expect(result.reasons).toHaveLength(2);
+    expect(result.reasons.some((r) => r.source === 'VITALS')).toBe(true);
+    expect(result.reasons.some((r) => r.source === 'SIGNS')).toBe(true);
   });
 
-  it('escalates ROUTINE to PRIORITY when waiting time exceeds 60 minutes', () => {
+  it('escalates ROUTINE to PRIORITY when waiting time exceeds 60 minutes with source=WAIT_TIME', () => {
     const input: TriageInput = {
       vitalsSeverity: 'NORMAL',
       vitalsReasons: [],
@@ -67,7 +98,11 @@ describe('triage.util', () => {
     const result = calculateTriage(input);
     expect(result.level).toBe('PRIORITY');
     expect(
-      result.reasons.some((r) => r.includes('Waiting time escalation')),
+      result.reasons.some(
+        (r) =>
+          r.label.includes('Waiting time escalation') &&
+          r.source === 'WAIT_TIME',
+      ),
     ).toBe(true);
   });
 
@@ -94,11 +129,16 @@ describe('triage.util', () => {
     expect(result.level).toBe('PRIORITY');
     expect(result.score).toBeGreaterThanOrEqual(2000);
     expect(
-      result.reasons.some((r) => r.includes('Safety bias escalation')),
+      result.reasons.some(
+        (r) =>
+          r.label.includes('Safety bias escalation') && r.source === 'WARNING',
+      ),
     ).toBe(true);
     expect(
-      result.reasons.some((r) =>
-        r.includes('Missing data warning: SpO2 not recorded'),
+      result.reasons.some(
+        (r) =>
+          r.label.includes('Missing data warning: SpO2 not recorded') &&
+          r.source === 'WARNING',
       ),
     ).toBe(true);
   });

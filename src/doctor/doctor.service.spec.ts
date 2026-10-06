@@ -310,5 +310,89 @@ describe('DoctorService - Visit State Machine (F1)', () => {
       expect(routine?.score).toBe(1000);
       expect(untriaged?.score).toBeGreaterThan(routine!.score);
     });
+
+    it('accurately derives hasGrowthFlag based on source === GROWTH from structured reasons (F7)', async () => {
+      const growthVisit = {
+        id: 'v-growth',
+        patient: {
+          id: 'p-growth',
+          uhid: '7C-2026-00003',
+          name: 'Underweight Toddler',
+          dob: new Date('2024-01-01'),
+          sex: 'MALE',
+          allergies: [],
+        },
+        anthropometry: { weightKg: 7.2, lengthOrStatureCm: 76.0 },
+        vitals: [],
+        signs: [],
+        complaints: [],
+        triageResult: {
+          level: 'PRIORITY',
+          score: 2100,
+          reasons: [
+            {
+              code: 'GROWTH_FLAG_ALERT',
+              severity: 'PRIORITY',
+              label: 'Growth alert: Underweight (Z < -2)',
+              source: 'GROWTH',
+            },
+          ],
+          configVersion: '2026.1-peds-opd',
+        },
+        priorityOverrides: [],
+        visitType: 'NEW',
+        tokenNumber: 3,
+        status: VisitStatus.WAITING_DOCTOR,
+        createdAt: new Date(),
+      };
+
+      const nonGrowthVisit = {
+        id: 'v-non-growth',
+        patient: {
+          id: 'p-fever',
+          uhid: '7C-2026-00004',
+          name: 'Child with Fever',
+          dob: new Date('2024-01-01'),
+          sex: 'FEMALE',
+          allergies: [],
+        },
+        anthropometry: null,
+        vitals: [],
+        signs: [],
+        complaints: [],
+        triageResult: {
+          level: 'PRIORITY',
+          score: 2000,
+          reasons: [
+            {
+              code: 'VITAL_ABNORMAL',
+              severity: 'PRIORITY',
+              label: 'Abnormal vital: Fever (38.5°C)',
+              source: 'VITALS',
+            },
+          ],
+          configVersion: '2026.1-peds-opd',
+        },
+        priorityOverrides: [],
+        visitType: 'NEW',
+        tokenNumber: 4,
+        status: VisitStatus.WAITING_DOCTOR,
+        createdAt: new Date(),
+      };
+
+      mockPrismaService.visit.findMany.mockResolvedValueOnce([
+        growthVisit,
+        nonGrowthVisit,
+      ]);
+
+      const queue = await service.getDoctorQueue(hospitalId);
+
+      const qGrowth = queue.find((q) => q.visitId === 'v-growth');
+      const qNonGrowth = queue.find((q) => q.visitId === 'v-non-growth');
+
+      expect(qGrowth?.hasGrowthFlag).toBe(true);
+      expect(qGrowth?.reasons).toContain('Growth alert: Underweight (Z < -2)');
+      expect(qNonGrowth?.hasGrowthFlag).toBe(false);
+    });
   });
 });

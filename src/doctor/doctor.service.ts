@@ -9,6 +9,7 @@ import { AuditService } from '../audit/audit.service.js';
 import { OverridePriorityDto } from './dto/override-priority.dto.js';
 import { TriageLevel, VisitStatus } from '../generated/prisma/enums.js';
 import { calculateAge } from '../common/utils/age.util.js';
+import type { StructuredReason } from '../common/utils/triage.util.js';
 
 export const ALLOWED_VISIT_TRANSITIONS: Record<VisitStatus, VisitStatus[]> = {
   [VisitStatus.REGISTERED]: [VisitStatus.WAITING_DOCTOR],
@@ -102,21 +103,58 @@ export class DoctorService {
         ? latestOverride.overrideLevel
         : originalLevel;
 
-      // Extract reasons safely from json
+      // Extract structured reasons safely from json (F7)
       const rawReasons = v.triageResult?.reasons;
-      const reasons: string[] = Array.isArray(rawReasons)
-        ? (rawReasons as string[])
+      const structuredReasons: StructuredReason[] = Array.isArray(rawReasons)
+        ? rawReasons.map((r: unknown) => {
+            if (
+              typeof r === 'object' &&
+              r !== null &&
+              'label' in r &&
+              'source' in r
+            ) {
+              return r as StructuredReason;
+            }
+            // Fallback for legacy string reasons
+            const text = String(r);
+            const isGrowth =
+              text.toLowerCase().includes('growth') ||
+              text.toLowerCase().includes('underweight') ||
+              text.toLowerCase().includes('wasting') ||
+              text.toLowerCase().includes('stature') ||
+              text.toLowerCase().includes('stunting');
+            return {
+              code: isGrowth ? 'GROWTH_FLAG' : 'LEGACY_REASON',
+              severity: 'INFO',
+              label: text,
+              source: isGrowth ? 'GROWTH' : 'SYSTEM',
+            };
+          })
         : [];
 
       if (!hasTriage && !latestOverride) {
-        reasons.push('Pending clinical vitals & triage evaluation');
+        structuredReasons.push({
+          code: 'PENDING_TRIAGE',
+          severity: 'INFO',
+          label: 'Pending clinical vitals & triage evaluation',
+          source: 'SYSTEM',
+        });
       }
 
       if (latestOverride) {
-        reasons.unshift(
-          `Clinician override: ${latestOverride.overrideLevel} (${latestOverride.reason})`,
-        );
+        structuredReasons.unshift({
+          code: 'CLINICIAN_OVERRIDE',
+          severity: latestOverride.overrideLevel,
+          label: `Clinician override: ${latestOverride.overrideLevel} (${latestOverride.reason})`,
+          source: 'OVERRIDE',
+        });
       }
+
+      // F7: Reliable growth flag detection: source === 'GROWTH'
+      const hasGrowthFlag = structuredReasons.some(
+        (r) => r.source === 'GROWTH',
+      );
+      const reasonLabels = structuredReasons.map((r) => r.label);
 
       // Numerical score for sorting:
       // EMERGENCY: >= 3000
@@ -150,7 +188,8 @@ export class DoctorService {
         originalLevel,
         isOverridden: !!latestOverride,
         score: sortScore,
-        reasons,
+        reasons: reasonLabels,
+        structuredReasons,
         complaints: v.complaints.map((c) => c.complaint.name),
         signs: v.signs.map((s) => ({
           name: s.sign.name,
@@ -161,15 +200,7 @@ export class DoctorService {
           reaction: a.reaction,
           severity: a.severity,
         })),
-        hasGrowthFlag: reasons.some(
-          (r) =>
-            r.toLowerCase().includes('growth') ||
-            r.toLowerCase().includes('underweight') ||
-            r.toLowerCase().includes('microcephaly') ||
-            r.toLowerCase().includes('stature') ||
-            r.toLowerCase().includes('stunting') ||
-            r.toLowerCase().includes('wasting'),
-        ),
+        hasGrowthFlag,
         latestVitals: v.vitals[0] || null,
         anthropometry: v.anthropometry,
       };

@@ -13,6 +13,7 @@ import { evaluateVitals } from '../common/utils/vitals.util.js';
 import { calculateTriage } from '../common/utils/triage.util.js';
 import { VisitStatus } from '../generated/prisma/enums.js';
 import { GrowthService } from '../growth/growth.service.js';
+import type { Prisma } from '../generated/prisma/client.js';
 
 @Injectable()
 export class VitalsService {
@@ -266,14 +267,14 @@ export class VitalsService {
         update: {
           level: triage.level,
           score: triage.score,
-          reasons: triage.reasons,
+          reasons: triage.reasons as unknown as Prisma.InputJsonValue,
           configVersion: triage.configVersion,
         },
         create: {
           visitId: visit.id,
           level: triage.level,
           score: triage.score,
-          reasons: triage.reasons,
+          reasons: triage.reasons as unknown as Prisma.InputJsonValue,
           configVersion: triage.configVersion,
         },
       });
