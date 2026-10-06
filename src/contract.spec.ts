@@ -24,6 +24,9 @@ describe('Frontend <-> Backend Route Contract', () => {
     { method: 'GET', path: '/api/catalog/signs' },
     { method: 'POST', path: '/api/catalog/signs' },
     { method: 'POST', path: '/api/catalog/sign-proposals' },
+    { method: 'GET', path: '/api/catalog/sign-proposals' },
+    { method: 'PATCH', path: '/api/catalog/signs/:id' },
+    { method: 'DELETE', path: '/api/catalog/signs/:id' },
     // Doctor & Growth
     { method: 'GET', path: '/api/doctor/queue' },
     { method: 'POST', path: '/api/doctor/triage/override' },

@@ -67,6 +67,7 @@ enum Avpu {
 enum ApprovalStatus {
   PENDING_DOCTOR_APPROVAL
   APPROVED
+  REJECTED
 }
 
 enum GrowthStandard {
@@ -283,16 +284,18 @@ model Complaint {
 }
 
 model Sign {
-  id           String          @id @default(uuid())
-  name         String          @unique
-  bodySystem   String
-  redFlagLevel RedFlagLevel    @default(NONE)
-  active       Boolean         @default(true)
-  createdAt    DateTime        @default(now())
-  updatedAt    DateTime        @updatedAt
+  id               String          @id @default(uuid())
+  name             String          @unique
+  bodySystem       String
+  redFlagLevel     RedFlagLevel    @default(NONE)
+  status           ApprovalStatus  @default(APPROVED)
+  proposedByUserId String?
+  active           Boolean         @default(true)
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
 
-  complaints   ComplaintSign[]
-  visits       VisitSign[]
+  complaints       ComplaintSign[]
+  visits           VisitSign[]
 }
 
 model ComplaintSign {
