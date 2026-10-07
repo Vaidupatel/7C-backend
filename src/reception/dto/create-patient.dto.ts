@@ -17,6 +17,7 @@ import {
   AllergySeverity,
   MeasurementMethod,
 } from '../../generated/prisma/enums.js';
+import { IsNotFutureDate } from '../../common/validators/is-not-future-date.validator.js';
 
 export class GuardianDto {
   @IsString()
@@ -113,6 +114,7 @@ export class CreatePatientDto {
 
   @IsString()
   @IsNotEmpty({ message: 'Date of birth is required' })
+  @IsNotFutureDate({ message: 'Date of birth cannot be in the future' })
   dob!: string;
 
   @IsEnum(Sex, { message: 'Sex must be either MALE or FEMALE' })

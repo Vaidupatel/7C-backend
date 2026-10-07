@@ -194,3 +194,29 @@ export function calculateAge(
     formattedAge,
   };
 }
+
+/**
+ * Safe age calculation wrapper that catches invalid or future dates
+ * and returns a fallback AgeResult instead of throwing.
+ * Use for read/query projections where invalid data should not crash the endpoint.
+ */
+export function safeCalculateAge(
+  dobInput: Date | string,
+  referenceDateInput: Date | string = new Date(),
+  gestationalAgeWeeks: number = 40,
+): AgeResult {
+  try {
+    return calculateAge(dobInput, referenceDateInput, gestationalAgeWeeks);
+  } catch {
+    return {
+      totalDays: 0,
+      totalMonths: 0,
+      years: 0,
+      months: 0,
+      days: 0,
+      isPreterm: false,
+      correctedAgeMonths: 0,
+      formattedAge: 'Unknown (invalid DOB)',
+    };
+  }
+}

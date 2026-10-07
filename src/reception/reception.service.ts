@@ -9,7 +9,7 @@ import { AuditService } from '../audit/audit.service.js';
 import { CreatePatientDto } from './dto/create-patient.dto.js';
 import { CreateVisitDto } from './dto/create-visit.dto.js';
 import {
-  calculateAge,
+  safeCalculateAge,
   AgeResult,
   getHospitalDayBoundaries,
 } from '../common/utils/age.util.js';
@@ -84,7 +84,7 @@ export class ReceptionService {
 
     return patients.map((p) => {
       const primaryG = p.guardians[0]?.guardian;
-      const age = calculateAge(
+      const age = safeCalculateAge(
         p.dob,
         new Date(),
         p.gestationalAgeWeeks ?? undefined,
@@ -382,7 +382,7 @@ export class ReceptionService {
       throw new NotFoundException('Patient record not found');
     }
 
-    const age = calculateAge(
+    const age = safeCalculateAge(
       patient.dob,
       new Date(),
       patient.gestationalAgeWeeks ?? undefined,
@@ -429,7 +429,7 @@ export class ReceptionService {
         name: v.patient.name,
         dob: v.patient.dob,
         sex: v.patient.sex,
-        age: calculateAge(
+        age: safeCalculateAge(
           v.patient.dob,
           v.visitDate,
           v.patient.gestationalAgeWeeks ?? undefined,

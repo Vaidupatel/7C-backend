@@ -8,7 +8,7 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
 import { OverridePriorityDto } from './dto/override-priority.dto.js';
 import { TriageLevel, VisitStatus } from '../generated/prisma/enums.js';
-import { calculateAge } from '../common/utils/age.util.js';
+import { safeCalculateAge } from '../common/utils/age.util.js';
 import type { StructuredReason } from '../common/utils/triage.util.js';
 
 export const ALLOWED_VISIT_TRANSITIONS: Record<VisitStatus, VisitStatus[]> = {
@@ -308,7 +308,7 @@ export class DoctorService {
     }
 
     const visitsWithAge = patient.visits.map((v) => {
-      const ageResult = calculateAge(
+      const ageResult = safeCalculateAge(
         patient.dob,
         v.visitDate,
         patient.gestationalAgeWeeks ?? undefined,

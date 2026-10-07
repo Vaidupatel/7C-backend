@@ -43,7 +43,7 @@ export class AuthController {
   @Post('login')
   @Public()
   @Throttle({
-    auth: { ttl: 60000, limit: process.env.NODE_ENV === 'test' ? 1000 : 5 },
+    default: { ttl: 60000, limit: process.env.NODE_ENV === 'test' ? 1000 : 10 },
   })
   @HttpCode(HttpStatus.OK)
   async login(
@@ -74,7 +74,7 @@ export class AuthController {
 
   @Post('refresh')
   @Public()
-  @Throttle({ auth: { ttl: 60000, limit: 10 } })
+  @Throttle({ default: { ttl: 60000, limit: 20 } })
   @HttpCode(HttpStatus.OK)
   async refresh(
     @Req() req: Request,

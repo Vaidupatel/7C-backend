@@ -8,7 +8,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
 import { RecordVitalsDto } from './dto/record-vitals.dto.js';
-import { calculateAge } from '../common/utils/age.util.js';
+import { safeCalculateAge } from '../common/utils/age.util.js';
 import { evaluateVitals } from '../common/utils/vitals.util.js';
 import { calculateTriage } from '../common/utils/triage.util.js';
 import { VisitStatus } from '../generated/prisma/enums.js';
@@ -121,7 +121,7 @@ export class VitalsService {
     }
 
     // 1. Calculate patient age
-    const ageResult = calculateAge(visit.patient.dob, visit.visitDate);
+    const ageResult = safeCalculateAge(visit.patient.dob, visit.visitDate);
     const ageMonths = ageResult.totalMonths;
 
     // 2. Evaluate Vitals

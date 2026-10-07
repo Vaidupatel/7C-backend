@@ -1,4 +1,8 @@
-import { calculateAge, getHospitalDayBoundaries } from './age.util.js';
+import {
+  calculateAge,
+  safeCalculateAge,
+  getHospitalDayBoundaries,
+} from './age.util.js';
 
 describe('calculateAge (Pure Logic)', () => {
   it('calculates age for a newborn on the same day as birth', () => {
@@ -85,6 +89,38 @@ describe('calculateAge (Pure Logic)', () => {
     expect(() => calculateAge(dob, ref)).toThrow(
       'Date of Birth cannot be in the future',
     );
+  });
+
+  describe('safeCalculateAge', () => {
+    it('returns calculated age for valid inputs', () => {
+      const dob = new Date('2025-10-04');
+      const ref = new Date('2026-10-04');
+      const result = safeCalculateAge(dob, ref);
+
+      expect(result.years).toBe(1);
+      expect(result.months).toBe(0);
+      expect(result.formattedAge).toBe('12 mos 0 d');
+    });
+
+    it('returns fallback AgeResult when Date of Birth is in the future', () => {
+      const dob = new Date('2026-11-09');
+      const ref = new Date('2026-10-07');
+      const result = safeCalculateAge(dob, ref);
+
+      expect(result.totalDays).toBe(0);
+      expect(result.totalMonths).toBe(0);
+      expect(result.years).toBe(0);
+      expect(result.months).toBe(0);
+      expect(result.days).toBe(0);
+      expect(result.formattedAge).toBe('Unknown (invalid DOB)');
+    });
+
+    it('returns fallback AgeResult when Date of Birth is invalid string', () => {
+      const result = safeCalculateAge('invalid-date');
+
+      expect(result.formattedAge).toBe('Unknown (invalid DOB)');
+      expect(result.totalMonths).toBe(0);
+    });
   });
 
   describe('getHospitalDayBoundaries (Finding C9)', () => {

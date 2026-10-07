@@ -47,17 +47,12 @@ import { DoctorModule } from './doctor/doctor.module.js';
             : undefined,
       },
     }),
-    // Security Check 28: Global + named throttle configs
+    // Security Check 28: Global rate limit configuration (generous 300 req/min for clinical UI & polling)
     ThrottlerModule.forRoot([
       {
-        name: 'global',
+        name: 'default',
         ttl: 60000,
-        limit: 100,
-      },
-      {
-        name: 'auth',
-        ttl: 60000,
-        limit: process.env.NODE_ENV === 'test' ? 1000 : 5,
+        limit: 300,
       },
     ]),
     PrismaModule,
