@@ -46,10 +46,13 @@ async function seed() {
     process.env.INITIAL_ADMIN_PASSWORD ||
     crypto.randomBytes(12).toString('base64');
   const demoDoctorPassword =
-    process.env.DEMO_DOCTOR_PASSWORD || 'Doctor@7Colour2026!';
+    process.env.DEMO_DOCTOR_PASSWORD ||
+    crypto.randomBytes(12).toString('base64');
   const demoReceptionPassword =
-    process.env.DEMO_RECEPTION_PASSWORD || 'Reception@7Colour2026!';
-  const demoMoPassword = process.env.DEMO_MO_PASSWORD || 'MO@7Colour2026!';
+    process.env.DEMO_RECEPTION_PASSWORD ||
+    crypto.randomBytes(12).toString('base64');
+  const demoMoPassword =
+    process.env.DEMO_MO_PASSWORD || crypto.randomBytes(12).toString('base64');
 
   console.log('--- CREDENTIALS NOTICE (Shown during seed only) ---');
   console.log(`Admin User: admin@7colour.com | Password: ${adminPassword}`);
