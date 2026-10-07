@@ -243,6 +243,7 @@ describe('Reception & Intake Module (e2e)', () => {
         name: 'Suresh Kumar',
         relationship: 'Father',
         phone: '+91 98765 43210',
+        consentGiven: true,
       },
     };
 
@@ -328,6 +329,7 @@ describe('Reception & Intake Module (e2e)', () => {
           name: 'Parent 1',
           relationship: 'Mother',
           phone: '+91 99999 11111',
+          consentGiven: true,
         },
       });
 
@@ -342,6 +344,7 @@ describe('Reception & Intake Module (e2e)', () => {
           name: 'Parent 2',
           relationship: 'Father',
           phone: '+91 99999 22222',
+          consentGiven: true,
         },
       });
 
